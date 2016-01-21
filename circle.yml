@@ -8,8 +8,7 @@ dependencies:
 
 test:
     override:
-        - eval "$(ssh-agent -s)"
-        - ssh-add ~/.ssh/id_circleci_github
+        - eval "$(ssh-agent -s)"; ssh-add ~/.ssh/id_circleci_github
         - make test
         - make bench
         - make release_lnx64
