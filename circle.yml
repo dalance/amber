@@ -1,0 +1,22 @@
+dependencies:
+    post:
+        - curl -sf -L https://static.rust-lang.org/rustup.sh | sh /dev/stdin --channel=nightly --yes
+        - curl -O https://static.rust-lang.org/dist/rust-nightly-x86_64-pc-windows-gnu.tar.gz
+        - tar xf rust-nightly-x86_64-pc-windows-gnu.tar.gz
+        - sudo cp -r rust-nightly-x86_64-pc-windows-gnu/rustc/bin/rustlib/x86_64-pc-windows-gnu /usr/local/lib/rustlib/
+        - sudo apt-get install mingw-w64
+
+test:
+    override:
+        - make test
+        - make bench
+        - make release_lnx64
+        - make release_win64
+        - cp amber*.zip $CIRCLE_ARTIFACTS
+
+deployment:
+    release:
+        tag: /v[0-9]+(\.[0-9]+)*/
+        commands:
+            - go get github.com/aktau/github-release
+            - ./github-release.sh

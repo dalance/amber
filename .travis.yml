@@ -1,0 +1,7 @@
+language: rust
+os: osx
+rust: nightly
+script:
+  - make test
+  - make bench
+  - make release_osx64
