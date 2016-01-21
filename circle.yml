@@ -13,10 +13,10 @@ dependencies:
 
 test:
     override:
-        - make test
-        - make bench
-        - make release_lnx64
-        - make release_win64
+        - SSH_AUTH_SOCK=`ls /tmp/ssh*/agent*` make test
+        - SSH_AUTH_SOCK=`ls /tmp/ssh*/agent*` make bench
+        - SSH_AUTH_SOCK=`ls /tmp/ssh*/agent*` make release_lnx64
+        - SSH_AUTH_SOCK=`ls /tmp/ssh*/agent*` make release_win64
         - cp amber*.zip $CIRCLE_ARTIFACTS
 
 deployment:
