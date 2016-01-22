@@ -29,7 +29,7 @@ after_test:
     - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\%RUST_INSTALL_TRIPLE%\release\amb*
 
 artifacts:
-    - path: amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip
+    - path: amber*.zip
     - name: amber
 
 deploy:
