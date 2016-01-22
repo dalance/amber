@@ -10,8 +10,10 @@ environment:
     matrix:
         - RUST_INSTALL_TRIPLE: i686-pc-windows-msvc
           RUST_VERSION: 1.6.0
+          ARCH: i686
         - RUST_INSTALL_TRIPLE: x86_64-pc-windows-msvc
           RUST_VERSION: 1.6.0
+          ARCH: x86_64
 
 install:
     - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-${env:RUST_VERSION}-${env:RUST_INSTALL_TRIPLE}.exe"
@@ -22,3 +24,19 @@ build: false
 test_script:
     - cmd: cargo test
     - cmd: cargo build --release --target=%RUST_INSTALL_TRIPLE%
+
+after_test:
+    - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\%RUST_INSTALL_TRIPLE%\release\amb*
+
+artifacts:
+    - path: amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip
+    - name: amber
+
+deploy:
+    provider: GitHub
+    auth_token:
+        secure:
+    artifact: /.*\.zip/
+    on:
+        branch: master
+        appveyor_repo_tag: true
