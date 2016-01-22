@@ -18,7 +18,7 @@ environment:
 install:
     - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-${env:RUST_VERSION}-${env:RUST_INSTALL_TRIPLE}.exe"
     - cmd: rust-%RUST_VERSION%-%RUST_INSTALL_TRIPLE%.exe /VERYSILENT /NORESTART /DIR="%RUST_INSTALL_DIR%"
-    - cmd: SET PATH=%RUST_INSTALL_DIR%\bin
+    - cmd: SET PATH="%PATH%;%RUST_INSTALL_DIR%\bin"
 
 build_script:
     - cmd: cargo build --release --target=%RUST_INSTALL_TRIPLE%
@@ -36,7 +36,7 @@ artifacts:
 deploy:
     provider: GitHub
     auth_token:
-        secure:
+        secure: YwL0NwyM+vym8U4Gxc8hbOEZ4+MHe6gMzTc9FebvvIoB3VLGSs7t4JtXQxiJixl9
     artifact: /.*\.zip/
     on:
         branch: master
