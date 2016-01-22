@@ -18,6 +18,6 @@ deploy:
   file:
     - amber-*.zip
   file_glob: true
-  pre-release: true
+  prerelease: true
   on:
     repo: dalance/amber
