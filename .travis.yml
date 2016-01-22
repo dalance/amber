@@ -7,7 +7,7 @@ os:
 rust: stable
 
 before_install:
-    - sudo apt-get install -y mingw-w64
+    - sudo apt-get install -y binutils-mingw-w64 gcc-mingw-w64 g++-mingw-w64
 
 before_script:
   - if [[ $TRAVIS_OS_NAME == "linux" ]]; then curl -O https://static.rust-lang.org/dist/rust-std-1.6.0-x86_64-pc-windows-gnu.tar.gz; fi
