@@ -6,10 +6,16 @@ os:
 
 rust: stable
 
+before_script:
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then curl -O https://static.rust-lang.org/dist/rust-1.6.0-x86_64-pc-windows-gnu.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then tar xf rust-1.6.0-x86_64-pc-windows-gnu.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then mv rust-std-1.6.0-x86_64-pc-windows-gnu/rust-std-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu ~/rust/lib/rustlib/
+
 script:
   - make test
   - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx64; fi
   - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx64; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_win64; fi
 
 deploy:
   provider: releases
