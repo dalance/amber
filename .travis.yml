@@ -6,9 +6,19 @@ os:
 
 rust: stable
 
+before_script:
+  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then curl -O https://static.rust-lang.org/dist/rust-std-1.6.0-i686-apple-darwin.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then tar xf rust-std-1.6.0-i686-apple-darwin.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then mv rust-std-1.6.0-i686-apple-darwin/rust-std-i686-apple-darwin/lib/rustlib/i686-apple-darwin ~/rust/lib/rustlib/; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then curl -O https://static.rust-lang.org/dist/rust-std-1.6.0-i686-unknown-linux-gnu.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then tar xf rust-std-1.6.0-i686-unknown-linux-gnu.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then mv rust-std-1.6.0-i686-unknown-linux-gnu/rust-std-i686-unknown-linux-gnu/lib/rustlib/i686-unknown-linux-gnu ~/rust/lib/rustlib/; fi
+
 script:
   - make test
+  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx32; fi
   - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx64; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx32; fi
   - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx64; fi
 
 deploy:
