@@ -20,12 +20,13 @@ install:
     - cmd: rust-%RUST_VERSION%-%RUST_INSTALL_TRIPLE%.exe /VERYSILENT /NORESTART /DIR="%RUST_INSTALL_DIR%"
     - cmd: SET PATH=%RUST_INSTALL_DIR%\bin
 
-build: false
-test_script:
+before_build:
     - cmd: cargo test
     - cmd: cargo build --release --target=%RUST_INSTALL_TRIPLE%
 
-after_test:
+build: false
+
+after_build:
     - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\%RUST_INSTALL_TRIPLE%\release\amb*
 
 artifacts:
