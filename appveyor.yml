@@ -24,7 +24,7 @@ build_script:
     - cmd: cargo build --release --target=%RUST_INSTALL_TRIPLE%
 
 after_build:
-    - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\target\%RUST_INSTALL_TRIPLE%\release\amb*
+    - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\target\%RUST_INSTALL_TRIPLE%\release\amb*.exe
 
 test_script:
     - cmd: cargo test
