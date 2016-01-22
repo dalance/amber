@@ -8,8 +8,8 @@ rust: stable
 
 before_script:
   - if [[ $TRAVIS_OS_NAME == "linux" ]]; then curl -O https://static.rust-lang.org/dist/rust-1.6.0-x86_64-pc-windows-gnu.tar.gz; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then tar xf rust-1.6.0-x86_64-pc-windows-gnu.tar.gz; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then mv rust-std-1.6.0-x86_64-pc-windows-gnu/rust-std-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu ~/rust/lib/rustlib/; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then tar xvf rust-1.6.0-x86_64-pc-windows-gnu.tar.gz; fi
+  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then ls; mv rust-std-1.6.0-x86_64-pc-windows-gnu/rust-std-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu ~/rust/lib/rustlib/; fi
 
 script:
   - make test
@@ -24,6 +24,6 @@ deploy:
   file:
     - amber-*.zip
   file_glob: true
-  prerelease: true
   on:
     repo: dalance/amber
+    tags: true
