@@ -1,5 +1,3 @@
-#![feature(test)]
-
 extern crate docopt;
 extern crate memmap;
 extern crate num_cpus;
@@ -10,18 +8,13 @@ extern crate scoped_threadpool;
 extern crate time;
 extern crate tempfile;
 extern crate term;
-extern crate test;
-
-mod console;
-mod matcher;
-mod path_finder;
-mod util;
 
 use console::{Console, ConsoleTextKind};
-use docopt::Docopt;
 use matcher::{Match, Matcher, QuickSearchMatcher, RegexMatcher};
-use memmap::{Mmap, Protection};
 use path_finder::{PathFinder, SimplePathFinder};
+use util::{catch, decode_error, read_from_file, watch_time};
+use docopt::Docopt;
+use memmap::{Mmap, Protection};
 use std::env;
 use std::fs;
 use std::io;
@@ -29,14 +22,13 @@ use std::io::{Write, Error};
 use std::path::{Component, Path, PathBuf};
 use std::process;
 use tempfile::NamedTempFile;
-use util::{catch, decode_error, read_from_file, watch_time};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------------------------------------------------
 
 #[allow(dead_code)]
-static USAGE_SEARCH: &'static str = "
+static USAGE_AMBS: &'static str = "
 Search <keyword> from current directory or <paths>
 
 Usage:
@@ -45,26 +37,26 @@ Usage:
     ambs ( --help | --version )
 
 Options:
-    --key-file <file>         Use file contents as keyword
-    --max-threads <num>       Number of max threads ( default: auto )
-    --bin-check-bytes <bytes> Read size by byte for checking binary ( default: 1024 )
-    --regex                   Enable regular expression search
-    --column                  Enable column output
-    --binary                  Enable binary file search
-    --statistics              Enable statistics output
-    --skipped                 Enable skipped file output
-    --no-interactive          Disable interactive replace
-    --no-recursive            Disable recursive directory search
-    --no-symlink              Disable symbolic link follow
-    --no-color                Disable colored output
-    --no-file                 Disable filename output
-    --no-skip-vcs             Disable vcs directory ( .hg/.git/.svn ) skip
-    -h --help                 Show this message
-    -v --version              Show version
+    --key-file <file>          Use file contents as keyword
+    --max-threads <num>        Number of max threads ( default: auto )
+    --bin-check-bytes <bytes>  Read size by byte for checking binary ( default: 1024 )
+    --regex                    Enable regular expression search
+    --column                   Enable column output
+    --binary                   Enable binary file search
+    --statistics               Enable statistics output
+    --skipped                  Enable skipped file output
+    --no-interactive           Disable interactive replace
+    --no-recursive             Disable recursive directory search
+    --no-symlink               Disable symbolic link follow
+    --no-color                 Disable colored output
+    --no-file                  Disable filename output
+    --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
+    -h --help                  Show this message
+    -v --version               Show version
 ";
 
 #[allow(dead_code)]
-static USAGE_REPLACE: &'static str = "
+static USAGE_AMBR: &'static str = "
 Replace <keyword> to <replacement> from current directory or <paths>
 
 Usage:
@@ -73,23 +65,23 @@ Usage:
     ambr ( --help | --version )
 
 Options:
-    --key-file <file>         Use file contents as keyword
-    --rep-file <file>         Use file contents as replacement
-    --max-threads <num>       Number of max threads ( default: auto )
-    --bin-check-bytes <bytes> Read size by byte for checking binary ( default: 1024 )
-    --regex                   Enable regular expression search
-    --column                  Enable column output
-    --binary                  Enable binary file search
-    --statistics              Enable statistics output
-    --skipped                 Enable skipped file output
-    --no-interactive          Disable interactive replace
-    --no-recursive            Disable recursive directory search
-    --no-symlink              Disable symbolic link follow
-    --no-color                Disable colored output
-    --no-file                 Disable filename output
-    --no-skip-vcs             Disable vcs directory ( .hg/.git/.svn ) skip
-    -h --help                 Show this message
-    -v --version              Show version
+    --key-file <file>          Use file contents as keyword
+    --rep-file <file>          Use file contents as replacement
+    --max-threads <num>        Number of max threads ( default: auto )
+    --bin-check-bytes <bytes>  Read size by byte for checking binary ( default: 1024 )
+    --regex                    Enable regular expression search
+    --column                   Enable column output
+    --binary                   Enable binary file search
+    --statistics               Enable statistics output
+    --skipped                  Enable skipped file output
+    --no-interactive           Disable interactive replace
+    --no-recursive             Disable recursive directory search
+    --no-symlink               Disable symbolic link follow
+    --no-color                 Disable colored output
+    --no-file                  Disable filename output
+    --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
+    -h --help                  Show this message
+    -v --version               Show version
 ";
 
 #[allow(dead_code)]
@@ -117,8 +109,103 @@ struct Args {
     flag_no_skip_vcs    : bool,
 }
 
+impl Args {
+    fn from_ambs( args: &ArgsAmbs ) -> Self {
+        Args {
+            arg_keyword          : args.arg_keyword         .clone(),
+            arg_replacement      : String::new()                    ,
+            arg_paths            : args.arg_paths           .clone(),
+            flag_key_file        : args.flag_key_file       .clone(),
+            flag_rep_file        : None                             ,
+            flag_max_threads     : args.flag_max_threads    .clone(),
+            flag_bin_check_bytes : args.flag_bin_check_bytes.clone(),
+            flag_regex           : args.flag_regex                  ,
+            flag_column          : args.flag_column                 ,
+            flag_binary          : args.flag_binary                 ,
+            flag_statistics      : args.flag_statistics             ,
+            flag_skipped         : args.flag_skipped                ,
+            flag_no_interactive  : args.flag_no_interactive         ,
+            flag_no_recursive    : args.flag_no_recursive           ,
+            flag_no_symlink      : args.flag_no_symlink             ,
+            flag_no_color        : args.flag_no_color               ,
+            flag_no_file         : args.flag_no_file                ,
+            flag_no_skip_vcs     : args.flag_no_skip_vcs            ,
+        }
+    }
+    fn from_ambr( args: &ArgsAmbr ) -> Self {
+        Args {
+            arg_keyword          : args.arg_keyword         .clone(),
+            arg_replacement      : args.arg_replacement     .clone(),
+            arg_paths            : args.arg_paths           .clone(),
+            flag_key_file        : args.flag_key_file       .clone(),
+            flag_rep_file        : args.flag_rep_file       .clone(),
+            flag_max_threads     : args.flag_max_threads    .clone(),
+            flag_bin_check_bytes : args.flag_bin_check_bytes.clone(),
+            flag_regex           : args.flag_regex                  ,
+            flag_column          : args.flag_column                 ,
+            flag_binary          : args.flag_binary                 ,
+            flag_statistics      : args.flag_statistics             ,
+            flag_skipped         : args.flag_skipped                ,
+            flag_no_interactive  : args.flag_no_interactive         ,
+            flag_no_recursive    : args.flag_no_recursive           ,
+            flag_no_symlink      : args.flag_no_symlink             ,
+            flag_no_color        : args.flag_no_color               ,
+            flag_no_file         : args.flag_no_file                ,
+            flag_no_skip_vcs     : args.flag_no_skip_vcs            ,
+        }
+    }
+}
+
+#[derive(RustcDecodable, Debug)]
+struct ArgsAmbs {
+    arg_keyword         : String,
+    arg_paths           : Vec<String>,
+    flag_key_file       : Option<String>,
+    flag_max_threads    : Option<usize>,
+    flag_bin_check_bytes: Option<usize>,
+    flag_regex          : bool,
+    flag_column         : bool,
+    flag_binary         : bool,
+    flag_statistics     : bool,
+    flag_skipped        : bool,
+    flag_no_interactive : bool,
+    flag_no_recursive   : bool,
+    flag_no_symlink     : bool,
+    flag_no_color       : bool,
+    flag_no_file        : bool,
+    flag_no_skip_vcs    : bool,
+}
+
+#[derive(RustcDecodable, Debug)]
+struct ArgsAmbr {
+    arg_keyword         : String,
+    arg_replacement     : String,
+    arg_paths           : Vec<String>,
+    flag_key_file       : Option<String>,
+    flag_rep_file       : Option<String>,
+    flag_max_threads    : Option<usize>,
+    flag_bin_check_bytes: Option<usize>,
+    flag_regex          : bool,
+    flag_column         : bool,
+    flag_binary         : bool,
+    flag_statistics     : bool,
+    flag_skipped        : bool,
+    flag_no_interactive : bool,
+    flag_no_recursive   : bool,
+    flag_no_symlink     : bool,
+    flag_no_color       : bool,
+    flag_no_file        : bool,
+    flag_no_skip_vcs    : bool,
+}
+
+#[derive(PartialEq)]
+enum ProgMode {
+    Search ,
+    Replace,
+}
+
 #[allow(dead_code)]
-fn main() {
+pub fn main() {
 
     // ---------------------------------------------------------------------------------------------
     // Parse Arguments
@@ -128,17 +215,26 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let program_path = args[0].clone();
     let program_name = Path::new( &program_path ).file_name();
-    let search_mode = match program_name {
-        Some( p ) if p.to_str().unwrap_or( "" ).contains( "ambs" ) => true ,
-        Some( p ) if p.to_str().unwrap_or( "" ).contains( "ambr" ) => false,
-        _                                                          => true ,
+    let program_mode = match program_name {
+        Some( p ) if p.to_str().unwrap_or( "" ).contains( "ambs" ) => ProgMode::Search ,
+        Some( p ) if p.to_str().unwrap_or( "" ).contains( "ambr" ) => ProgMode::Replace,
+        _                                                          => ProgMode::Search ,
     };
 
     // - Create config from Docopt ---------------------------------------------
     let version = format!( "Version: {}", VERSION );
-    let usage = if search_mode { USAGE_SEARCH } else { USAGE_REPLACE };
 
-    let args: Args = Docopt::new( usage ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );
+    let args = match program_mode {
+        ProgMode::Search => {
+            let args_ambs: ArgsAmbs = Docopt::new( USAGE_AMBS ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );
+            Args::from_ambs( &args_ambs )
+        },
+        ProgMode::Replace => {
+            let args_ambr: ArgsAmbr = Docopt::new( USAGE_AMBR ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );
+            Args::from_ambr( &args_ambr )
+        },
+    };
+
     let conf = Config::from_args( &args );
 
     let mut console = Console::new();
@@ -349,9 +445,9 @@ fn main() {
     // ---------------------------------------------------------------------------------------------
 
     let replace_time = watch_time ( || {
-        if search_mode { return }
+        if program_mode == ProgMode::Search { return }
 
-        'outer: for mpath in &matched {
+        for mpath in &matched {
 
             let result = catch::<_, (), Error> ( || {
                 let tmpfile_dir = mpath.path.parent().unwrap();
@@ -385,8 +481,8 @@ fn main() {
                                     "no"   => { do_replace  = false; break },
                                     "a"    => { all_replace = true ; break },
                                     "all"  => { all_replace = true ; break },
-                                    "q"    => return Ok(()),
-                                    "quit" => return Ok(()),
+                                    "q"    => { let _ = tmpfile.close(); process::exit( 0 ) },
+                                    "quit" => { let _ = tmpfile.close(); process::exit( 0 ) },
                                     _      => continue,
                                 }
                             }
@@ -425,7 +521,7 @@ fn main() {
     // ---------------------------------------------------------------------------------------------
 
     let display_time = watch_time ( || {
-        if !search_mode { return }
+        if program_mode == ProgMode::Replace { return }
 
         for mpath in &matched {
             let result = catch::<_, (), Error> ( || {
@@ -469,7 +565,7 @@ fn main() {
         console.write( ConsoleTextKind::Other, &format!( "  Path Find Time     : {}s\n"  , path_find_time   as f64 / 1000000000.0 ) );
         console.write( ConsoleTextKind::Other, &format!( "  Path Filter Time   : {}s\n"  , path_filter_time as f64 / 1000000000.0 ) );
         console.write( ConsoleTextKind::Other, &format!( "  Match Time         : {}s\n"  , match_time       as f64 / 1000000000.0 ) );
-        if !search_mode {
+        if program_mode == ProgMode::Replace {
         console.write( ConsoleTextKind::Other, &format!( "  Replace Time       : {}s\n"  , replace_time     as f64 / 1000000000.0 ) );
         };
         console.write( ConsoleTextKind::Other, &format!( "  Display Time       : {}s\n\n", display_time     as f64 / 1000000000.0 ) );

@@ -107,7 +107,6 @@ impl PathFinder for SimplePathFinder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::Bencher;
     use std::path::PathBuf;
 
     #[test]
@@ -116,22 +115,20 @@ mod tests {
 
         let path = finder.find( vec![PathBuf::from( "./" )] );
         assert!( path.contains( &PathBuf::from( "./Cargo.toml" ) ) );
-        assert!( path.contains( &PathBuf::from( "./src/main.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/ambr.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/ambs.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/bin.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/console.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/lib.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/matcher.rs" ) ) );
         assert!( path.contains( &PathBuf::from( "./src/path_finder.rs" ) ) );
+        assert!( path.contains( &PathBuf::from( "./src/util.rs" ) ) );
 
         let path = finder.find( vec![PathBuf::from( "aa" )] );
         assert!( path.is_empty() );
 
         let path = finder.find( vec![PathBuf::from( "Cargo.toml" )] );
         assert!( path.contains( &PathBuf::from( "Cargo.toml" ) ) );
-    }
-
-    #[bench]
-    fn bench_simple_path_finder( b: &mut Bencher ) {
-        b.iter( || {
-            let mut finder = SimplePathFinder::new();
-            finder.find( vec![PathBuf::from( "/usr/src/kernels/3.10.0-229.11.1.el7.x86_64" )] );
-        } );
     }
 }
 

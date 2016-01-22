@@ -1,7 +1,15 @@
 [package]
-name = "ambs"
+name = "amber"
 version = "0.1.0"
 authors = ["nhatta"]
+
+[[bin]]
+name = "ambr"
+path = "src/ambr.rs"
+
+[[bin]]
+name = "ambs"
+path = "src/ambs.rs"
 
 [dependencies]
 time              = "*"

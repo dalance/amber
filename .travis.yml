@@ -1,7 +1,13 @@
 language: rust
+os: linux
 os: osx
-rust: nightly
+rust: stable
 script:
   - make test
-  - make bench
-  - make release_osx64
+  - if [ $TRAVIS_OS_NAME -eq "osx"   ]; then make release_osx64; fi
+  - if [ $TRAVIS_OS_NAME -eq "linux" ]; then make release_lnx64; fi
+
+matrix:
+    include:
+        - os: linux
+        - os: osx
