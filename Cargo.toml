@@ -2,6 +2,7 @@
 name = "amber"
 version = "0.1.0"
 authors = ["nhatta"]
+build = "build.rs"
 
 [[bin]]
 name = "ambr"
