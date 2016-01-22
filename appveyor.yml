@@ -30,7 +30,7 @@ after_test:
 
 artifacts:
     - path: amber*.zip
-    - name: amber
+      name: amber
 
 deploy:
     provider: GitHub
