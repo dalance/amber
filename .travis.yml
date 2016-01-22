@@ -18,7 +18,6 @@ script:
   - make test
   - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx32; fi
   - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx64; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx32; fi
   - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx64; fi
 
 deploy:
