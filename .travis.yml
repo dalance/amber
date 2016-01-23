@@ -27,7 +27,7 @@ deploy:
   file:
     - amber-*.zip
   file_glob: true
-  all_branches: true
+  skip_cleanup: true
   on:
     repo: dalance/amber
     tags: true
