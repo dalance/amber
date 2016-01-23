@@ -39,5 +39,5 @@ deploy:
         secure: YwL0NwyM+vym8U4Gxc8hbOEZ4+MHe6gMzTc9FebvvIoB3VLGSs7t4JtXQxiJixl9
     artifact: /.*\.zip/
     on:
-        branch: master
+        branch: /v\d+\.\d+\.\d+/
         appveyor_repo_tag: true
