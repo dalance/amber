@@ -39,6 +39,7 @@ Usage:
 Options:
     --key-file <file>          Use file contents as keyword
     --max-threads <num>        Number of max threads ( default: auto )
+    --size-per-thread <bytes>  File size per one thread ( default: 1024 * 1024 = 1MB )
     --bin-check-bytes <bytes>  Read size by byte for checking binary ( default: 1024 )
     --regex                    Enable regular expression search
     --column                   Enable column output
@@ -68,6 +69,7 @@ Options:
     --key-file <file>          Use file contents as keyword
     --rep-file <file>          Use file contents as replacement
     --max-threads <num>        Number of max threads ( default: auto )
+    --size-per-thread <bytes>  File size per one thread ( default: 1024 * 1024 = 1MB )
     --bin-check-bytes <bytes>  Read size by byte for checking binary ( default: 1024 )
     --regex                    Enable regular expression search
     --column                   Enable column output
@@ -95,6 +97,7 @@ struct Args {
     flag_key_file       : Option<String>,
     flag_rep_file       : Option<String>,
     flag_max_threads    : Option<usize>,
+    flag_size_per_thread: Option<usize>,
     flag_bin_check_bytes: Option<usize>,
     flag_regex          : bool,
     flag_column         : bool,
@@ -118,6 +121,7 @@ impl Args {
             flag_key_file        : args.flag_key_file       .clone(),
             flag_rep_file        : None                             ,
             flag_max_threads     : args.flag_max_threads    .clone(),
+            flag_size_per_thread : args.flag_size_per_thread.clone(),
             flag_bin_check_bytes : args.flag_bin_check_bytes.clone(),
             flag_regex           : args.flag_regex                  ,
             flag_column          : args.flag_column                 ,
@@ -140,6 +144,7 @@ impl Args {
             flag_key_file        : args.flag_key_file       .clone(),
             flag_rep_file        : args.flag_rep_file       .clone(),
             flag_max_threads     : args.flag_max_threads    .clone(),
+            flag_size_per_thread : args.flag_size_per_thread.clone(),
             flag_bin_check_bytes : args.flag_bin_check_bytes.clone(),
             flag_regex           : args.flag_regex                  ,
             flag_column          : args.flag_column                 ,
@@ -162,6 +167,7 @@ struct ArgsAmbs {
     arg_paths           : Vec<String>,
     flag_key_file       : Option<String>,
     flag_max_threads    : Option<usize>,
+    flag_size_per_thread: Option<usize>,
     flag_bin_check_bytes: Option<usize>,
     flag_regex          : bool,
     flag_column         : bool,
@@ -184,6 +190,7 @@ struct ArgsAmbr {
     flag_key_file       : Option<String>,
     flag_rep_file       : Option<String>,
     flag_max_threads    : Option<usize>,
+    flag_size_per_thread: Option<usize>,
     flag_bin_check_bytes: Option<usize>,
     flag_regex          : bool,
     flag_column         : bool,
@@ -371,7 +378,8 @@ pub fn main() {
 
     let match_time = watch_time ( || {
         let mut matcher_qs    = QuickSearchMatcher::new();
-        matcher_qs.max_threads = conf.match_max_threads;
+        matcher_qs.max_threads     = conf.match_max_threads;
+        matcher_qs.size_per_thread = conf.match_size_per_thread;
         let matcher_regex = RegexMatcher::new();
         let matcher: &Matcher = if conf.match_regex { &matcher_regex } else { &matcher_qs };
 
@@ -589,6 +597,7 @@ struct Config {
     filter_bin_check_bytes: usize,
     match_regex           : bool ,
     match_max_threads     : usize,
+    match_size_per_thread : usize,
     replace_interactive   : bool ,
     display_color         : bool ,
     display_file          : bool ,
@@ -607,6 +616,7 @@ impl Config {
             filter_bin_check_bytes: args.flag_bin_check_bytes.unwrap_or( 1024 ),
             match_regex           : args.flag_regex,
             match_max_threads     : args.flag_max_threads.unwrap_or( num_cpus::get() ),
+            match_size_per_thread : args.flag_size_per_thread.unwrap_or( 1024 * 1024 ),
             replace_interactive   : !args.flag_no_interactive,
             display_color         : !args.flag_no_color,
             display_file          : !args.flag_no_file,
