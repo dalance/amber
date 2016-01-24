@@ -32,6 +32,24 @@ impl Console {
         }
     }
 
+    pub fn carriage_return( &mut self ) {
+        let _ = self.term_stdout.carriage_return();
+    }
+
+    pub fn cursor_up( &mut self ) {
+        let _ = self.term_stdout.cursor_up();
+    }
+
+    pub fn delete_line( &mut self ) {
+        let _ = self.term_stdout.delete_line();
+    }
+
+    pub fn write_with_clear( &mut self, kind: ConsoleTextKind, val: &str ) {
+        self.carriage_return();
+        self.delete_line();
+        self.write( kind, val );
+    }
+
     pub fn write( &mut self, kind: ConsoleTextKind, val: &str ) {
         if self.is_color {
             let color = match kind {

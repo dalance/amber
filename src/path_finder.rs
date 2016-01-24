@@ -1,12 +1,20 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::mpsc::Sender;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PathFinder
 // ---------------------------------------------------------------------------------------------------------------------
 
+pub enum PathResult {
+    Ok( PathBuf ),
+    Err( String ),
+    None,
+}
+
 pub trait PathFinder {
-    fn find( &mut self, base: Vec<PathBuf> ) -> Vec<PathBuf>;
+    fn find      ( &mut self, base: Vec<PathBuf> ) -> Vec<PathBuf>;
+    fn find_async( &mut self, base: Vec<PathBuf>, tx: Sender<PathResult> );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -31,7 +39,6 @@ impl SimplePathFinder {
     }
 
     fn find_path( &mut self, base: PathBuf ) -> Vec<PathBuf> {
-        self.errors = Vec::new();
         let mut ret: Vec<PathBuf> = Vec::new();
 
         let attr = match fs::metadata( &base ) {
@@ -82,6 +89,7 @@ impl SimplePathFinder {
 
         ret
     }
+
 }
 
 impl PathFinder for SimplePathFinder {
@@ -97,6 +105,23 @@ impl PathFinder for SimplePathFinder {
         }
 
         ret
+    }
+
+    fn find_async( &mut self, base: Vec<PathBuf>, tx: Sender<PathResult> ) {
+        self.errors = Vec::new();
+
+        for b in base {
+            let path = self.find_path( b );
+            for p in path {
+                let _ = tx.send( PathResult::Ok( p ) );
+            }
+        }
+
+        for e in &self.errors {
+            let _ = tx.send( PathResult::Err( e.clone() ) );
+        }
+
+        let _ = tx.send( PathResult::None );
     }
 }
 

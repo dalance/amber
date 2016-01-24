@@ -11,7 +11,7 @@ extern crate term;
 
 use console::{Console, ConsoleTextKind};
 use matcher::{Match, Matcher, QuickSearchMatcher, RegexMatcher};
-use path_finder::{PathFinder, SimplePathFinder};
+use path_finder::{PathFinder, PathResult, SimplePathFinder};
 use util::{catch, decode_error, read_from_file, watch_time};
 use docopt::Docopt;
 use memmap::{Mmap, Protection};
@@ -21,6 +21,8 @@ use std::io;
 use std::io::{Write, Error};
 use std::path::{Component, Path, PathBuf};
 use std::process;
+use std::sync::mpsc;
+use std::thread;
 use tempfile::NamedTempFile;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -46,6 +48,7 @@ Options:
     --binary                   Enable binary file search
     --statistics               Enable statistics output
     --skipped                  Enable skipped file output
+    --no-progress              Disable progress output
     --no-interactive           Disable interactive replace
     --no-recursive             Disable recursive directory search
     --no-symlink               Disable symbolic link follow
@@ -76,6 +79,7 @@ Options:
     --binary                   Enable binary file search
     --statistics               Enable statistics output
     --skipped                  Enable skipped file output
+    --no-progress              Disable progress output
     --no-interactive           Disable interactive replace
     --no-recursive             Disable recursive directory search
     --no-symlink               Disable symbolic link follow
@@ -104,6 +108,7 @@ struct Args {
     flag_binary         : bool,
     flag_statistics     : bool,
     flag_skipped        : bool,
+    flag_no_progress    : bool,
     flag_no_interactive : bool,
     flag_no_recursive   : bool,
     flag_no_symlink     : bool,
@@ -128,6 +133,7 @@ impl Args {
             flag_binary          : args.flag_binary                 ,
             flag_statistics      : args.flag_statistics             ,
             flag_skipped         : args.flag_skipped                ,
+            flag_no_progress     : args.flag_no_progress            ,
             flag_no_interactive  : args.flag_no_interactive         ,
             flag_no_recursive    : args.flag_no_recursive           ,
             flag_no_symlink      : args.flag_no_symlink             ,
@@ -151,6 +157,7 @@ impl Args {
             flag_binary          : args.flag_binary                 ,
             flag_statistics      : args.flag_statistics             ,
             flag_skipped         : args.flag_skipped                ,
+            flag_no_progress     : args.flag_no_progress            ,
             flag_no_interactive  : args.flag_no_interactive         ,
             flag_no_recursive    : args.flag_no_recursive           ,
             flag_no_symlink      : args.flag_no_symlink             ,
@@ -174,6 +181,7 @@ struct ArgsAmbs {
     flag_binary         : bool,
     flag_statistics     : bool,
     flag_skipped        : bool,
+    flag_no_progress    : bool,
     flag_no_interactive : bool,
     flag_no_recursive   : bool,
     flag_no_symlink     : bool,
@@ -197,6 +205,7 @@ struct ArgsAmbr {
     flag_binary         : bool,
     flag_statistics     : bool,
     flag_skipped        : bool,
+    flag_no_progress    : bool,
     flag_no_interactive : bool,
     flag_no_recursive   : bool,
     flag_no_symlink     : bool,
@@ -297,17 +306,33 @@ pub fn main() {
     let mut found_paths: Vec<PathBuf> = Vec::new();
 
     let path_find_time = watch_time ( || {
-        let mut finder = SimplePathFinder::new();
-        finder.is_recursive   = conf.find_recursive;
-        finder.follow_symlink = conf.find_follow_symlink;
+        let ( tx, rx ) = mpsc::channel();
 
-        let ret = finder.find( base_paths );
-        for r in ret {
-            found_paths.push( r );
+        let conf_local = conf.clone();
+        thread::spawn( move || {
+            let mut finder = SimplePathFinder::new();
+            finder.is_recursive   = conf_local.find_recursive;
+            finder.follow_symlink = conf_local.find_follow_symlink;
+
+            finder.find_async( base_paths, tx );
+        } );
+
+        loop {
+            match rx.recv().unwrap() {
+                PathResult::Ok ( p ) => {
+                    found_paths.push( p );
+                    if conf.progress && found_paths.len() % 10 == 0 {
+                        console.write_with_clear( ConsoleTextKind::Other, &format!( "Count of paths found   : {}", found_paths.len() ) );
+                    }
+                },
+                PathResult::Err( e ) => {
+                    console.write_with_clear( ConsoleTextKind::Error, &format!( "Error: {}\n", e ) )
+                },
+                PathResult::None      => break,
+            }
         }
-
-        for e in &finder.errors {
-            console.write( ConsoleTextKind::Error, &format!( "Error: {}\n", e ) );
+        if conf.progress {
+            console.write_with_clear( ConsoleTextKind::Other, &format!( "Count of paths found   : {}\n", found_paths.len() ) );
         }
     } );
 
@@ -318,6 +343,7 @@ pub fn main() {
     let mut filtered_paths: Vec<PathBuf> = Vec::new();
 
     let path_filter_time = watch_time ( || {
+        let mut filtered_path = 0;
         for path in &found_paths {
             let result = catch::<_, (), Error> ( || {
                 let dir = path.parent().unwrap();
@@ -337,21 +363,23 @@ pub fn main() {
                     return Ok(())
                 }
 
-                let mmap = try!( Mmap::open_path( &path, Protection::Read ) );
-                let src  = unsafe { mmap.as_slice() };
+                if conf.filter_binary {
+                    let mmap = try!( Mmap::open_path( &path, Protection::Read ) );
+                    let src  = unsafe { mmap.as_slice() };
 
-                let mut is_binary = false;
-                let bin_check_len = if conf.filter_bin_check_bytes < src.len() { conf.filter_bin_check_bytes } else { src.len() };
-                for i in 0..bin_check_len {
-                    if src[i] <= 0x08 {
-                        is_binary = true;
+                    let mut is_binary = false;
+                    let bin_check_len = if conf.filter_bin_check_bytes < src.len() { conf.filter_bin_check_bytes } else { src.len() };
+                    for i in 0..bin_check_len {
+                        if src[i] <= 0x08 {
+                            is_binary = true;
+                        }
                     }
-                }
-                if is_binary & conf.filter_binary {
-                    if conf.filter_show {
-                        console.write( ConsoleTextKind::Other, &format!( "Skipped: {:?} ( binary file )\n", path ) );
+                    if is_binary {
+                        if conf.filter_show {
+                            console.write( ConsoleTextKind::Other, &format!( "Skipped: {:?} ( binary file )\n", path ) );
+                        }
+                        return Ok(())
                     }
-                    return Ok(())
                 }
 
                 filtered_paths.push( path.clone() );
@@ -359,9 +387,19 @@ pub fn main() {
                 Ok(())
             } );
             match result {
-                Ok ( _ ) => (),
+                Ok ( _ ) => {
+                    if conf.progress {
+                        filtered_path += 1;
+                        if filtered_path % 10 == 0 {
+                            console.write_with_clear( ConsoleTextKind::Other, &format!( "Count of paths filtered: {} / {}", filtered_path, found_paths.len() ) );
+                        }
+                    }
+                },
                 Err( e ) => console.write( ConsoleTextKind::Error, &format!( "Error: {} @ {:?}\n", decode_error( e.kind() ), path ) ),
             }
+        }
+        if conf.progress {
+            console.write_with_clear( ConsoleTextKind::Other, &format!( "Count of paths filtered: {} / {}\n", filtered_path, found_paths.len() ) );
         }
     } );
 
@@ -383,6 +421,7 @@ pub fn main() {
         let matcher_regex = RegexMatcher::new();
         let matcher: &Matcher = if conf.match_regex { &matcher_regex } else { &matcher_qs };
 
+        let mut matched_path = 0;
         for path in &filtered_paths {
             let result = catch::<_, (), Error> ( || {
                 let mmap = try!( Mmap::open_path( &path, Protection::Read ) );
@@ -396,9 +435,21 @@ pub fn main() {
                 Ok(())
             } );
             match result {
-                Ok ( _ ) => (),
-                Err( e ) => console.write( ConsoleTextKind::Error, &format!( "Error: {} @ {:?}\n", decode_error( e.kind() ), path ) ),
+                Ok ( _ ) => {
+                    if conf.progress {
+                        matched_path += 1;
+                        if matched_path % 10 == 0 {
+                            console.write_with_clear( ConsoleTextKind::Other, &format!( "Count of paths matched : {} / {}", matched_path, filtered_paths.len() ) );
+                        }
+                    }
+                },
+                Err( e ) => {
+                    console.write_with_clear( ConsoleTextKind::Error, &format!( "Error: {} @ {:?}\n", decode_error( e.kind() ), path ) )
+                }
             }
+        }
+        if conf.progress {
+            console.write_with_clear( ConsoleTextKind::Other, &format!( "Count of paths matched : {} / {}\n", matched_path, filtered_paths.len() ) );
         }
     } );
 
@@ -569,17 +620,19 @@ pub fn main() {
 
     if conf.display_statistics {
         console.write( ConsoleTextKind::Other, &format!( "\nStatistics\n" ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Max Threads        : {}\n\n" , conf.match_max_threads ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Path Find Time     : {}s\n"  , path_find_time   as f64 / 1000000000.0 ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Path Filter Time   : {}s\n"  , path_filter_time as f64 / 1000000000.0 ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Match Time         : {}s\n"  , match_time       as f64 / 1000000000.0 ) );
+        console.write( ConsoleTextKind::Other, &format!( "  Max threads: {}\n\n" , conf.match_max_threads ) );
+        console.write( ConsoleTextKind::Other, &format!( "  Consumed time\n" ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Find     : {}s\n"  , path_find_time   as f64 / 1000000000.0 ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Filter   : {}s\n"  , path_filter_time as f64 / 1000000000.0 ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Match    : {}s\n"  , match_time       as f64 / 1000000000.0 ) );
         if program_mode == ProgMode::Replace {
-        console.write( ConsoleTextKind::Other, &format!( "  Replace Time       : {}s\n"  , replace_time     as f64 / 1000000000.0 ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Replace  : {}s\n"  , replace_time     as f64 / 1000000000.0 ) );
         };
-        console.write( ConsoleTextKind::Other, &format!( "  Display Time       : {}s\n\n", display_time     as f64 / 1000000000.0 ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Found File Count   : {}\n"   , found_paths.len()    ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Filtered File Count: {}\n"   , filtered_paths.len() ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Matched File Count : {}\n"   , matched.len()        ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Display  : {}s\n\n", display_time     as f64 / 1000000000.0 ) );
+        console.write( ConsoleTextKind::Other, &format!( "  Path count\n" ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Found    : {}\n"   , found_paths.len()    ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Filtered : {}\n"   , filtered_paths.len() ) );
+        console.write( ConsoleTextKind::Other, &format!( "    Matched  : {}\n"   , matched.len()        ) );
     }
 }
 
@@ -589,6 +642,7 @@ pub fn main() {
 
 #[derive(Clone)]
 struct Config {
+    progress              : bool ,
     find_recursive        : bool ,
     find_follow_symlink   : bool ,
     filter_vcs            : bool ,
@@ -608,6 +662,7 @@ struct Config {
 impl Config {
     fn from_args( args: &Args ) -> Self {
         Config {
+            progress              : !args.flag_no_progress,
             find_recursive        : !args.flag_no_recursive,
             find_follow_symlink   : !args.flag_no_symlink,
             filter_vcs            : !args.flag_no_skip_vcs,
