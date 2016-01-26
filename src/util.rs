@@ -51,3 +51,12 @@ pub fn decode_error( e: ErrorKind ) -> &'static str {
         _                            => "unknown",
     }
 }
+
+pub enum PipelineInfo<T> {
+    Begin           ,
+    Ok  ( T        ),
+    Info( String   ),
+    Err ( String   ),
+    Time( u64, u64 ),
+    End             ,
+}

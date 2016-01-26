@@ -3,6 +3,7 @@ extern crate term;
 use matcher::Match;
 use std::io;
 use std::io::Write;
+use std::process;
 use term::{Terminal, StdoutTerminal, StderrTerminal};
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -26,8 +27,8 @@ pub struct Console {
 impl Console {
     pub fn new() -> Self {
         Console {
-            term_stdout: term::stdout().unwrap(),
-            term_stderr: term::stderr().unwrap(),
+            term_stdout: term::stdout().unwrap_or_else( || { process::exit( 1 ); } ),
+            term_stderr: term::stderr().unwrap_or_else( || { process::exit( 1 ); } ),
             is_color   : true,
         }
     }
@@ -59,18 +60,18 @@ impl Console {
                 ConsoleTextKind::Other     => term::color::BRIGHT_CYAN,
                 ConsoleTextKind::Error     => term::color::BRIGHT_RED,
             };
-            self.term_stdout.fg( color ).unwrap();
-            self.term_stderr.fg( color ).unwrap();
+            self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+            self.term_stderr.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
         }
 
         match kind {
-            ConsoleTextKind::Error => write!( self.term_stderr, "{}", val ).unwrap(),
-            _                      => write!( self.term_stdout, "{}", val ).unwrap(),
+            ConsoleTextKind::Error => write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
+            _                      => write!( self.term_stdout, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
         }
 
         if self.is_color {
-            self.term_stdout.reset().unwrap();
-            self.term_stderr.reset().unwrap();
+            self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+            self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
         }
         let _ = io::stdout().flush();
         let _ = io::stderr().flush();

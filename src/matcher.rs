@@ -1,9 +1,9 @@
 use regex::Regex;
+use scoped_threadpool::Pool;
 use std::cmp;
 use std::collections::HashMap;
 use std::str;
 use std::sync::mpsc;
-use scoped_threadpool::Pool;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Matcher
@@ -68,19 +68,17 @@ impl Matcher for BruteForceMatcher {
 
 pub struct QuickSearchMatcher {
     pub max_threads    : usize,
-    pub size_per_thread: usize
+    pub size_per_thread: usize,
 }
 
 impl QuickSearchMatcher {
     pub fn new() -> Self {
         QuickSearchMatcher {
             max_threads    : 4,
-            size_per_thread: 1024 * 1024
+            size_per_thread: 1024 * 1024,
         }
     }
-}
 
-impl QuickSearchMatcher {
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();
@@ -88,6 +86,8 @@ impl QuickSearchMatcher {
 
         let mut i = beg;
         while i < end {
+            if src_len < i+pat_len { break; }
+
             let mut success = true;
             for j in 0 .. pat_len {
                 if src[i+j] != pat[j] {
@@ -106,7 +106,6 @@ impl QuickSearchMatcher {
 
             if src_len <= i+pat_len { break; }
             i += qs_table[src[i+pat_len] as usize];
-            if src_len < i+pat_len { break; }
         }
 
         ret
@@ -247,7 +246,11 @@ impl Matcher for RegexMatcher {
             Err( _ ) => return Vec::new(),
         };
 
-        let re = Regex::new( pat_str ).unwrap();
+        let re = match Regex::new( pat_str ) {
+            Ok ( x ) => x,
+            Err( _ ) => return Vec::new(),
+        };
+
         let result = re.find_iter( src_str );
 
         let mut ret = Vec::new();
@@ -268,51 +271,51 @@ mod tests {
     use super::*;
 
     fn test_matcher<T:Matcher>( m: &T ) {
-            let src = "abcabcaaaaabc".to_string().into_bytes();
-            let pat = "a".to_string().into_bytes();
-            let ret = m.search( &src, &pat );
-            assert_eq!( ret.len(), 7 );
-            assert_eq!( ( 0,  1  ), ( ret[0].beg, ret[0].end ) );
-            assert_eq!( ( 3,  4  ), ( ret[1].beg, ret[1].end ) );
-            assert_eq!( ( 6,  7  ), ( ret[2].beg, ret[2].end ) );
-            assert_eq!( ( 7,  8  ), ( ret[3].beg, ret[3].end ) );
-            assert_eq!( ( 8,  9  ), ( ret[4].beg, ret[4].end ) );
-            assert_eq!( ( 9,  10 ), ( ret[5].beg, ret[5].end ) );
-            assert_eq!( ( 10, 11 ), ( ret[6].beg, ret[6].end ) );
+        let src = "abcabcaaaaabc".to_string().into_bytes();
+        let pat = "a".to_string().into_bytes();
+        let ret = m.search( &src, &pat );
+        assert_eq!( ret.len(), 7 );
+        assert_eq!( ( 0,  1  ), ( ret[0].beg, ret[0].end ) );
+        assert_eq!( ( 3,  4  ), ( ret[1].beg, ret[1].end ) );
+        assert_eq!( ( 6,  7  ), ( ret[2].beg, ret[2].end ) );
+        assert_eq!( ( 7,  8  ), ( ret[3].beg, ret[3].end ) );
+        assert_eq!( ( 8,  9  ), ( ret[4].beg, ret[4].end ) );
+        assert_eq!( ( 9,  10 ), ( ret[5].beg, ret[5].end ) );
+        assert_eq!( ( 10, 11 ), ( ret[6].beg, ret[6].end ) );
 
-            let src = "abcabcaaaaabc".to_string().into_bytes();
-            let pat = "abc".to_string().into_bytes();
-            let ret = m.search( &src, &pat );
-            assert_eq!( ret.len(), 3 );
-            assert_eq!( ( 0,  3  ), ( ret[0].beg, ret[0].end ) );
-            assert_eq!( ( 3,  6  ), ( ret[1].beg, ret[1].end ) );
-            assert_eq!( ( 10, 13 ), ( ret[2].beg, ret[2].end ) );
+        let src = "abcabcaaaaabc".to_string().into_bytes();
+        let pat = "abc".to_string().into_bytes();
+        let ret = m.search( &src, &pat );
+        assert_eq!( ret.len(), 3 );
+        assert_eq!( ( 0,  3  ), ( ret[0].beg, ret[0].end ) );
+        assert_eq!( ( 3,  6  ), ( ret[1].beg, ret[1].end ) );
+        assert_eq!( ( 10, 13 ), ( ret[2].beg, ret[2].end ) );
 
-            let src = "abcabcaaaaabc".to_string().into_bytes();
-            let pat = "aaa".to_string().into_bytes();
-            let ret = m.search( &src, &pat );
-            assert_eq!( ret.len(), 1 );
-            assert_eq!( ( 6, 9 ), ( ret[0].beg, ret[0].end ) );
+        let src = "abcabcaaaaabc".to_string().into_bytes();
+        let pat = "aaa".to_string().into_bytes();
+        let ret = m.search( &src, &pat );
+        assert_eq!( ret.len(), 1 );
+        assert_eq!( ( 6, 9 ), ( ret[0].beg, ret[0].end ) );
 
-            let src = "abcabcaaaaabc".to_string().into_bytes();
-            let pat = "abcabcaaaaabc".to_string().into_bytes();
-            let ret = m.search( &src, &pat );
-            assert_eq!( ret.len(), 1 );
-            assert_eq!( ( 0, 13 ), ( ret[0].beg, ret[0].end ) );
+        let src = "abcabcaaaaabc".to_string().into_bytes();
+        let pat = "abcabcaaaaabc".to_string().into_bytes();
+        let ret = m.search( &src, &pat );
+        assert_eq!( ret.len(), 1 );
+        assert_eq!( ( 0, 13 ), ( ret[0].beg, ret[0].end ) );
 
-            let src = "abcabcaaaaabc".to_string().into_bytes();
-            let pat = "あ".to_string().into_bytes();
-            let ret = m.search( &src, &pat );
-            assert!( ret.is_empty() );
+        let src = "abcabcaaaaabc".to_string().into_bytes();
+        let pat = "あ".to_string().into_bytes();
+        let ret = m.search( &src, &pat );
+        assert!( ret.is_empty() );
 
-            let src = "abcabcあいうえおaあああaaaabc".to_string().into_bytes();
-            let pat = "あ".to_string().into_bytes();
-            let ret = m.search( &src, &pat );
-            assert_eq!( ret.len(), 4 );
-            assert_eq!( ( 6 , 9  ), ( ret[0].beg, ret[0].end ) );
-            assert_eq!( ( 22, 25 ), ( ret[1].beg, ret[1].end ) );
-            assert_eq!( ( 25, 28 ), ( ret[2].beg, ret[2].end ) );
-            assert_eq!( ( 28, 31 ), ( ret[3].beg, ret[3].end ) );
+        let src = "abcabcあいうえおaあああaaaabc".to_string().into_bytes();
+        let pat = "あ".to_string().into_bytes();
+        let ret = m.search( &src, &pat );
+        assert_eq!( ret.len(), 4 );
+        assert_eq!( ( 6 , 9  ), ( ret[0].beg, ret[0].end ) );
+        assert_eq!( ( 22, 25 ), ( ret[1].beg, ret[1].end ) );
+        assert_eq!( ( 25, 28 ), ( ret[2].beg, ret[2].end ) );
+        assert_eq!( ( 28, 31 ), ( ret[3].beg, ret[3].end ) );
     }
 
     #[test]

@@ -6,7 +6,7 @@ VERSION = $(patsubst "%",%, $(word 3, $(shell grep version Cargo.toml)))
 all: test bench
 
 test:
-	cargo test
+	cargo test -- --nocapture
 
 bench:
 	cargo bench

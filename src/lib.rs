@@ -9,8 +9,11 @@ extern crate time;
 extern crate tempfile;
 extern crate term;
 
-pub mod bin;
 pub mod console;
 pub mod matcher;
-pub mod path_finder;
+pub mod pipeline_filter;
+pub mod pipeline_finder;
+pub mod pipeline_matcher;
+pub mod pipeline_printer;
+pub mod pipeline_replacer;
 pub mod util;

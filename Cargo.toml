@@ -12,16 +12,16 @@ name = "ambs"
 path = "src/ambs.rs"
 
 [dependencies]
-time              = "*"
-memmap            = "*"
 docopt            = "*"
-term              = "*"
-rustc-serialize   = "*"
+memmap            = "*"
+num_cpus          = "*"
 regex             = "*"
+rand              = "*"
+rustc-serialize   = "*"
 scoped_threadpool = "*"
 tempfile          = "*"
-num_cpus          = "*"
-rand              = "*"
+term              = "*"
+time              = "*"
 
 [profile.dev]
 opt-level        = 0
@@ -35,7 +35,7 @@ codegen-units    = 1
 opt-level        = 3
 debug            = false
 rpath            = false
-lto              = true
+lto              = false
 debug-assertions = false
 codegen-units    = 1
 
