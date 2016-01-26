@@ -169,11 +169,9 @@ mod tests {
         assert!( ret.contains( &PathBuf::from( "./Cargo.toml"         ) ) );
         assert!( ret.contains( &PathBuf::from( "./src/ambr.rs"        ) ) );
         assert!( ret.contains( &PathBuf::from( "./src/ambs.rs"        ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/bin.rs"         ) ) );
         assert!( ret.contains( &PathBuf::from( "./src/console.rs"     ) ) );
         assert!( ret.contains( &PathBuf::from( "./src/lib.rs"         ) ) );
         assert!( ret.contains( &PathBuf::from( "./src/matcher.rs"     ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/path_finder.rs" ) ) );
         assert!( ret.contains( &PathBuf::from( "./src/util.rs"        ) ) );
 
         assert!( time_bsy != 0 );
