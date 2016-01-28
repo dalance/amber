@@ -21,6 +21,40 @@ pub trait Matcher {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// macro
+// ---------------------------------------------------------------------------------------------------------------------
+
+macro_rules! cmp_pat_sse (
+    ( $src:expr, $pat:expr, $pat_len:expr, $pat_len_by_dq:expr, $do_mismatch:block ) => (
+        {
+            let mut src_ptr = &( $src ) as *const u8 as usize;
+            let mut pat_ptr = &( $pat ) as *const u8 as usize;
+            let mut pat_rest = $pat_len;
+            for _ in 0 .. $pat_len_by_dq {
+                unsafe {
+                    let ret_cmp: u64;
+                    asm!(
+                        "movdqu ($1), %xmm0                 \n\
+                         pcmpestri $$0b0011000, ($2), %xmm0 \n\
+                        "
+                        : "={rcx}"( ret_cmp )
+                        : "r"( pat_ptr ), "r"( src_ptr ), "{rdx}"( pat_rest ), "{rax}"( pat_rest )
+                        : "{xmm0}"
+                        :
+                    );
+                    if ret_cmp != 16 {
+                        $do_mismatch
+                    }
+                    src_ptr  += 16;
+                    pat_ptr  += 16;
+                    pat_rest -= 16;
+                }
+            }
+        }
+    );
+);
+
+// ---------------------------------------------------------------------------------------------------------------------
 // BruteForceMatcher
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -69,6 +103,7 @@ impl Matcher for BruteForceMatcher {
 pub struct QuickSearchMatcher {
     pub max_threads    : usize,
     pub size_per_thread: usize,
+    pub use_sse        : bool ,
 }
 
 impl QuickSearchMatcher {
@@ -76,10 +111,49 @@ impl QuickSearchMatcher {
         QuickSearchMatcher {
             max_threads    : 4,
             size_per_thread: 1024 * 1024,
+            use_sse        : false,
         }
     }
 
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
+        if self.use_sse {
+            self.search_sub_sse   ( src, pat, qs_table, beg, end )
+        } else {
+            self.search_sub_normal( src, pat, qs_table, beg, end )
+        }
+    }
+
+    fn search_sub_sse( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+        let mut ret = Vec::new();
+
+        let pat_len_by_dq = if pat_len % 16 == 0 { pat_len / 16 } else { pat_len / 16 + 1 };
+
+        let mut i = beg;
+        while i < end {
+            if src_len < i+pat_len { break; }
+
+            let mut success = true;
+
+            cmp_pat_sse!( src[i], pat[0], pat_len, pat_len_by_dq, { success = false; break; } );
+
+            if success {
+                if MatcherUtil::check_char_boundary( src, i ) {
+                    ret.push( Match { beg: i, end: i + pat_len, sub_match: Vec::new() } );
+                    i += pat_len;
+                    continue;
+                }
+            }
+
+            if src_len <= i+pat_len { break; }
+            i += qs_table[src[i+pat_len] as usize];
+        }
+
+        ret
+    }
+
+    fn search_sub_normal( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();
         let mut ret = Vec::new();
@@ -97,7 +171,7 @@ impl QuickSearchMatcher {
             }
 
             if success {
-                if self.check_char_boundary( src, i ) {
+                if MatcherUtil::check_char_boundary( src, i ) {
                     ret.push( Match { beg: i, end: i + pat_len, sub_match: Vec::new() } );
                     i += pat_len;
                     continue;
@@ -111,47 +185,6 @@ impl QuickSearchMatcher {
         ret
     }
 
-    fn check_char_boundary( &self, src: &[u8], pos: usize ) -> bool {
-        let mut pos_ascii = if pos == 0 { 0 } else { pos - 1 };
-        while pos_ascii > 0 {
-            if src[pos_ascii] <= 0x7f { break }
-            pos_ascii -= 1;
-        }
-
-        let mut check_pos = pos_ascii;
-        while check_pos < pos {
-            let char_width = self.check_char_width( src, check_pos );
-            check_pos += char_width;
-        }
-
-        check_pos == pos
-    }
-
-    fn check_char_width( &self, src: &[u8], pos: usize ) -> usize {
-        let src_len = src.len();
-        let pos0 = pos;
-        let pos1 = if pos + 1 >= src_len { src_len - 1 } else { pos + 1 };
-        let pos2 = if pos + 2 >= src_len { src_len - 1 } else { pos + 2 };
-        let pos3 = if pos + 3 >= src_len { src_len - 1 } else { pos + 3 };
-        let pos4 = if pos + 4 >= src_len { src_len - 1 } else { pos + 4 };
-        let pos5 = if pos + 5 >= src_len { src_len - 1 } else { pos + 5 };
-        match ( src[pos0], src[pos1], src[pos2], src[pos3], src[pos4], src[pos5] ) {
-            ( 0x00...0x7f, _          , _          , _          , _          , _           ) => ( 1 ), // ASCII
-            ( 0xc2...0xdf, 0x80...0xbf, _          , _          , _          , _           ) => ( 2 ), // UTF-8
-            ( 0xe0...0xef, 0x80...0xbf, 0x80...0xbf, _          , _          , _           ) => ( 3 ), // UTF-8
-            ( 0xf0...0xf7, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, _          , _           ) => ( 4 ), // UTF-8
-            ( 0xf8...0xfb, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, _           ) => ( 5 ), // UTF-8
-            ( 0xfc...0xfd, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf ) => ( 6 ), // UTF-8
-            ( 0x8e       , 0xa1...0xdf, _          , _          , _          , _           ) => ( 2 ), // EUC-JP
-            ( 0xa1...0xfe, 0xa1...0xfe, _          , _          , _          , _           ) => ( 2 ), // EUC-JP
-            ( 0xa1...0xdf, _          , _          , _          , _          , _           ) => ( 1 ), // ShiftJIS
-            ( 0x81...0x9f, 0x40...0x7e, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
-            ( 0x81...0x9f, 0x80...0xfc, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
-            ( 0xe0...0xef, 0x40...0x7e, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
-            ( 0xe0...0xef, 0x80...0xfc, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
-            _                                                                                => ( 1 ), // Unknown
-        }
-    }
 }
 
 //impl Matcher for QuickSearchMatcher {
@@ -223,6 +256,203 @@ impl Matcher for QuickSearchMatcher {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// TbmMatcher
+// ---------------------------------------------------------------------------------------------------------------------
+
+pub struct TbmMatcher {
+    pub max_threads    : usize,
+    pub size_per_thread: usize,
+    pub use_sse        : bool ,
+}
+
+impl TbmMatcher {
+    pub fn new() -> Self {
+        TbmMatcher {
+            max_threads    : 4,
+            size_per_thread: 1024 * 1024,
+            use_sse        : false,
+        }
+    }
+
+    fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
+        if self.use_sse {
+            self.search_sub_sse   ( src, pat, qs_table, md2, beg, end )
+        } else {
+            self.search_sub_normal( src, pat, qs_table, md2, beg, end )
+        }
+    }
+
+    fn search_sub_sse( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+        let mut ret = Vec::new();
+
+        let pat_len_by_dq = if pat_len % 16 == 0 { pat_len / 16 } else { pat_len / 16 + 1 };
+
+        let mut i = beg + pat_len - 1;
+        'outer: while i < end {
+            let mut k = qs_table[src[i] as usize];
+            while k != 0 {
+                i += k;
+                if i >= src_len { break 'outer; }
+                k = qs_table[src[i] as usize];
+            }
+
+            if i >= end {
+                break;
+            }
+
+            cmp_pat_sse!( src[i-pat_len+1], pat[0], pat_len, pat_len_by_dq, { i += md2; continue 'outer; } );
+
+            for j in 0 .. pat_len - 1 {
+                if src[i-pat_len+1+j] != pat[j] {
+                    i += md2;
+                    continue 'outer;
+                }
+            }
+
+            if MatcherUtil::check_char_boundary( src, i - pat_len + 1 ) {
+                ret.push( Match { beg: i - pat_len + 1, end: i + 1, sub_match: Vec::new() } );
+                i += pat_len;
+                continue;
+            }
+
+            i += md2;
+        }
+
+        ret
+    }
+
+    fn search_sub_normal( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+        let mut ret = Vec::new();
+
+        let mut i = beg + pat_len - 1;
+        'outer: while i < end {
+            let mut k = qs_table[src[i] as usize];
+            while k != 0 {
+                i += k;
+                if i >= src_len { break 'outer; }
+                k = qs_table[src[i] as usize];
+            }
+
+            if i >= end {
+                break;
+            }
+
+            for j in 0 .. pat_len - 1 {
+                if src[i-pat_len+1+j] != pat[j] {
+                    i += md2;
+                    continue 'outer;
+                }
+            }
+
+            if MatcherUtil::check_char_boundary( src, i - pat_len + 1 ) {
+                ret.push( Match { beg: i - pat_len + 1, end: i + 1, sub_match: Vec::new() } );
+                i += pat_len;
+                continue;
+            }
+
+            i += md2;
+        }
+
+        ret
+    }
+
+}
+
+/*
+impl Matcher for TbmMatcher {
+    fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+
+        let mut qs_table: [usize;256] = [pat_len;256];
+        for i in 0 .. pat_len {
+            qs_table[pat[i] as usize] = pat_len - 1 - i;
+        }
+
+        let     pe: isize = pat_len as isize - 1;
+        let mut p : isize = pe - 1;
+        while p >= 0 {
+            if pat[p as usize] == pat[pe as usize] {
+                break;
+            }
+            p -= 1;
+        }
+        let md2 = ( pe - p ) as usize;
+
+        let mut ret = Vec::new();
+        let tmp = self.search_sub( src, pat, &qs_table, md2, 0, src_len );
+        for t in tmp {
+            ret.push( t );
+        }
+
+        ret
+    }
+}
+*/
+
+impl Matcher for TbmMatcher {
+    fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+
+        let mut qs_table: [usize;256] = [pat_len;256];
+        for i in 0 .. pat_len {
+            qs_table[pat[i] as usize] = pat_len - 1 - i;
+        }
+
+        let     pe: isize = pat_len as isize - 1;
+        let mut p : isize = pe - 1;
+        while p >= 0 {
+            if pat[p as usize] == pat[pe as usize] {
+                break;
+            }
+            p -= 1;
+        }
+        let md2 = ( pe - p ) as usize;
+
+        let thread_num = cmp::min( src_len / self.size_per_thread + 1, self.max_threads );
+
+        if thread_num == 1 {
+            self.search_sub( src, pat, &qs_table, md2, 0, src_len )
+        } else {
+            let ( tx, rx ) = mpsc::channel();
+            let mut pool = Pool::new( thread_num as u32 );
+
+            pool.scoped( |scoped| {
+                for i in 0..thread_num {
+                    let tx  = tx.clone();
+                    let beg = src_len * i / thread_num;
+                    let end = src_len * ( i + 1 ) / thread_num;
+                    scoped.execute( move || {
+                        let tmp = self.search_sub( src, pat, &qs_table, md2, beg, end );
+                        let _ = tx.send( ( i, tmp ) );
+                    } );
+                }
+            } );
+
+            let mut rets = HashMap::new();
+            for _ in 0..thread_num {
+                let ( i, tmp ) = rx.recv().unwrap();
+                rets.insert( i, tmp );
+            }
+
+            let mut ret = Vec::new();
+            for i in 0..thread_num {
+                let tmp = rets.get( &i ).unwrap();
+                for t in tmp {
+                    ret.push( t.clone() );
+                }
+            }
+            ret
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // RegexMatcher
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -259,6 +489,56 @@ impl Matcher for RegexMatcher {
             ret.push( Match{ beg: beg, end: end, sub_match: Vec::new() });
         }
         ret
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// MatcherUtil
+// ---------------------------------------------------------------------------------------------------------------------
+
+struct MatcherUtil;
+
+impl MatcherUtil {
+    fn check_char_boundary( src: &[u8], pos: usize ) -> bool {
+        let mut pos_ascii = if pos == 0 { 0 } else { pos - 1 };
+        while pos_ascii > 0 {
+            if src[pos_ascii] <= 0x7f { break }
+            pos_ascii -= 1;
+        }
+
+        let mut check_pos = pos_ascii;
+        while check_pos < pos {
+            let char_width = MatcherUtil::check_char_width( src, check_pos );
+            check_pos += char_width;
+        }
+
+        check_pos == pos
+    }
+
+    fn check_char_width( src: &[u8], pos: usize ) -> usize {
+        let src_len = src.len();
+        let pos0 = pos;
+        let pos1 = if pos + 1 >= src_len { src_len - 1 } else { pos + 1 };
+        let pos2 = if pos + 2 >= src_len { src_len - 1 } else { pos + 2 };
+        let pos3 = if pos + 3 >= src_len { src_len - 1 } else { pos + 3 };
+        let pos4 = if pos + 4 >= src_len { src_len - 1 } else { pos + 4 };
+        let pos5 = if pos + 5 >= src_len { src_len - 1 } else { pos + 5 };
+        match ( src[pos0], src[pos1], src[pos2], src[pos3], src[pos4], src[pos5] ) {
+            ( 0x00...0x7f, _          , _          , _          , _          , _           ) => ( 1 ), // ASCII
+            ( 0xc2...0xdf, 0x80...0xbf, _          , _          , _          , _           ) => ( 2 ), // UTF-8
+            ( 0xe0...0xef, 0x80...0xbf, 0x80...0xbf, _          , _          , _           ) => ( 3 ), // UTF-8
+            ( 0xf0...0xf7, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, _          , _           ) => ( 4 ), // UTF-8
+            ( 0xf8...0xfb, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, _           ) => ( 5 ), // UTF-8
+            ( 0xfc...0xfd, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf, 0x80...0xbf ) => ( 6 ), // UTF-8
+            ( 0x8e       , 0xa1...0xdf, _          , _          , _          , _           ) => ( 2 ), // EUC-JP
+            ( 0xa1...0xfe, 0xa1...0xfe, _          , _          , _          , _           ) => ( 2 ), // EUC-JP
+            ( 0xa1...0xdf, _          , _          , _          , _          , _           ) => ( 1 ), // ShiftJIS
+            ( 0x81...0x9f, 0x40...0x7e, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
+            ( 0x81...0x9f, 0x80...0xfc, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
+            ( 0xe0...0xef, 0x40...0x7e, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
+            ( 0xe0...0xef, 0x80...0xfc, _          , _          , _          , _           ) => ( 2 ), // ShiftJIS
+            _                                                                                => ( 1 ), // Unknown
+        }
     }
 }
 
@@ -327,6 +607,26 @@ mod tests {
     #[test]
     fn test_quick_search_matcher() {
         let matcher = QuickSearchMatcher::new();
+        test_matcher( &matcher );
+    }
+
+    #[test]
+    fn test_quick_search_matcher_sse() {
+        let mut matcher = QuickSearchMatcher::new();
+        matcher.use_sse = true;
+        test_matcher( &matcher );
+    }
+
+    #[test]
+    fn test_tbm_matcher() {
+        let matcher = TbmMatcher::new();
+        test_matcher( &matcher );
+    }
+
+    #[test]
+    fn test_tbm_matcher_sse() {
+        let mut matcher = TbmMatcher::new();
+        matcher.use_sse = true;
         test_matcher( &matcher );
     }
 

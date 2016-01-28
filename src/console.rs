@@ -15,6 +15,7 @@ pub enum ConsoleTextKind {
     Text     ,
     MatchText,
     Other    ,
+    Info     ,
     Error    ,
 }
 
@@ -58,6 +59,7 @@ impl Console {
                 ConsoleTextKind::Text      => term::color::WHITE,
                 ConsoleTextKind::MatchText => term::color::BRIGHT_YELLOW,
                 ConsoleTextKind::Other     => term::color::BRIGHT_CYAN,
+                ConsoleTextKind::Info      => term::color::BRIGHT_CYAN,
                 ConsoleTextKind::Error     => term::color::BRIGHT_RED,
             };
             self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
@@ -66,6 +68,7 @@ impl Console {
 
         match kind {
             ConsoleTextKind::Error => write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
+            ConsoleTextKind::Info  => write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
             _                      => write!( self.term_stdout, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
         }
 

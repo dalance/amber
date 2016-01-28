@@ -4,7 +4,7 @@ extern crate num_cpus;
 extern crate rustc_serialize;
 
 use amber::console::{Console, ConsoleTextKind};
-use amber::matcher::{Matcher, QuickSearchMatcher, RegexMatcher};
+use amber::matcher::{Matcher, RegexMatcher, QuickSearchMatcher, TbmMatcher};
 use amber::pipeline_filter::{PipelineFilter, SimplePipelineFilter};
 use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
 use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
@@ -49,6 +49,10 @@ Options:
     --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
     -h --help                  Show this message
     -v --version               Show version
+
+Experimental Options:
+    --tbm                      Enable TBM matcher
+    --sse                      Enable SSE 4.2
 ";
 
 #[allow(dead_code)]
@@ -73,6 +77,8 @@ struct Args {
     flag_no_color       : bool,
     flag_no_file        : bool,
     flag_no_skip_vcs    : bool,
+    flag_tbm            : bool,
+    flag_sse            : bool,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -87,7 +93,7 @@ fn main() {
     // ---------------------------------------------------------------------------------------------
 
     // - Create config from Docopt ---------------------------------------------
-    let version = format!( "Version: {}", VERSION );
+    let version = format!( "ambs version {}", VERSION );
 
     let usage = String::from( USAGE ).replace( "num_cpus", &format!( "{}", num_cpus::get() * 4 ) );
     let args: Args = Docopt::new( usage ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );
@@ -157,6 +163,8 @@ fn main() {
     let max_threads     = cmp::max( args.flag_max_threads - 4, 1 );
     let size_per_thread = args.flag_size_per_thread;
     let regex           = args.flag_regex;
+    let tbm             = args.flag_tbm;
+    let sse             = args.flag_sse;
 
     let _ = thread::Builder::new().name( "finder".to_string() ).spawn( move || {
         finder.find( finder_in_rx, finder_out_tx );
@@ -168,10 +176,15 @@ fn main() {
 
     let _ = thread::Builder::new().name( "matcher".to_string() ).spawn( move || {
         let mut m_qs    = QuickSearchMatcher::new();
+        let mut m_tbm   = TbmMatcher::new();
         let     m_regex = RegexMatcher::new();
-        m_qs.max_threads     = max_threads;
-        m_qs.size_per_thread = size_per_thread;
-        let m: &Matcher = if regex { &m_regex } else { &m_qs };
+        m_qs.max_threads      = max_threads;
+        m_qs.size_per_thread  = size_per_thread;
+        m_qs.use_sse          = sse;
+        m_tbm.max_threads     = max_threads;
+        m_tbm.size_per_thread = size_per_thread;
+        m_tbm.use_sse         = sse;
+        let m: &Matcher = if regex { &m_regex } else if tbm { &m_tbm } else { &m_qs };
 
         matcher.search( m, &keyword, matcher_in_rx, matcher_out_tx );
     } );
@@ -224,7 +237,7 @@ fn main() {
         }
         match printer_out_rx.try_recv() {
             Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_printer_bsy = t0; time_printer_all = t1; },
-            Ok ( PipelineInfo::Info( i      ) ) => console.write( ConsoleTextKind::Other, &format!( "{}\n", i ) ),
+            Ok ( PipelineInfo::Info( i      ) ) => console.write( ConsoleTextKind::Info , &format!( "{}\n", i ) ),
             Ok ( PipelineInfo::Err ( e      ) ) => console.write( ConsoleTextKind::Error, &format!( "{}\n", e ) ),
             Ok ( PipelineInfo::End            ) => break,
             Ok ( _                            ) => (),
@@ -246,16 +259,16 @@ fn main() {
     let sec_printer_all  = time_printer_all  as f64 / 1000000000.0;
 
     if args.flag_statistics {
-        console.write( ConsoleTextKind::Other, &format!( "\nStatistics\n" ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Max threads: {}\n\n" , args.flag_max_threads ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Consumed time ( busy / total )\n" ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Find     : {}s / {}s\n"  , sec_finder_bsy  , sec_finder_all   ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Filter   : {}s / {}s\n"  , sec_filter_bsy  , sec_filter_all   ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Match    : {}s / {}s\n"  , sec_matcher_bsy , sec_matcher_all  ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
-        console.write( ConsoleTextKind::Other, &format!( "  Path count\n" ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Found    : {}\n"   , count_finder  ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Filtered : {}\n"   , count_filter  ) );
-        console.write( ConsoleTextKind::Other, &format!( "    Matched  : {}\n"   , count_matcher ) );
+        console.write( ConsoleTextKind::Info, &format!( "\nStatistics\n" ) );
+        console.write( ConsoleTextKind::Info, &format!( "  Max threads: {}\n\n" , args.flag_max_threads ) );
+        console.write( ConsoleTextKind::Info, &format!( "  Consumed time ( busy / total )\n" ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Find     : {}s / {}s\n"  , sec_finder_bsy  , sec_finder_all   ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Filter   : {}s / {}s\n"  , sec_filter_bsy  , sec_filter_all   ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Match    : {}s / {}s\n"  , sec_matcher_bsy , sec_matcher_all  ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
+        console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Filtered : {}\n"   , count_filter  ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );
     }
 }

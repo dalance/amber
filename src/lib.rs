@@ -1,3 +1,5 @@
+#![feature(asm)]
+
 extern crate docopt;
 extern crate memmap;
 extern crate num_cpus;

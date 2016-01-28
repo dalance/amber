@@ -1,6 +1,6 @@
 use matcher::{Match, Matcher};
 use memmap::{Mmap, Protection};
-use std::io::{Error, Write, stderr};
+use std::io::Error;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use time;
@@ -33,10 +33,6 @@ pub struct SimplePipelineMatcher {
     time_beg              : u64,
     time_end              : u64,
     time_bsy              : u64,
-    time_mmap             : u64,
-    time_src              : u64,
-    time_filter           : u64,
-    time_search           : u64,
 }
 
 impl SimplePipelineMatcher {
@@ -50,10 +46,6 @@ impl SimplePipelineMatcher {
             time_beg          : 0,
             time_end          : 0,
             time_bsy          : 0,
-            time_mmap         : 0,
-            time_src          : 0,
-            time_filter       : 0,
-            time_search       : 0,
         }
     }
 
@@ -61,17 +53,9 @@ impl SimplePipelineMatcher {
         let path_org = path.clone();
 
         let result = catch::<_, PathMatch, Error> ( || {
-            let mut beg = time::precise_time_ns();
 
             let mmap = try!( Mmap::open_path( &path, Protection::Read ) );
-
-            self.time_mmap += time::precise_time_ns() - beg;
-            beg = time::precise_time_ns();
-
             let src  = unsafe { mmap.as_slice() };
-
-            self.time_src += time::precise_time_ns() - beg;
-            beg = time::precise_time_ns();
 
             if self.skip_binary {
                 let mut is_binary = false;
@@ -89,12 +73,7 @@ impl SimplePipelineMatcher {
                 }
             }
 
-            self.time_filter += time::precise_time_ns() - beg;
-            beg = time::precise_time_ns();
-
             let ret = matcher.search( src, keyword );
-
-            self.time_search += time::precise_time_ns() - beg;
 
             Ok( PathMatch { path: path.clone(), matches: ret } )
         } );
@@ -130,11 +109,6 @@ impl PipelineMatcher for SimplePipelineMatcher {
                     let _ = tx.send( PipelineInfo::Begin );
                 },
                 Ok( PipelineInfo::End ) => {
-                    let _ = writeln!( &mut stderr(), "mmap  : {}", self.time_mmap   );
-                    let _ = writeln!( &mut stderr(), "src   : {}", self.time_src    );
-                    let _ = writeln!( &mut stderr(), "filter: {}", self.time_filter );
-                    let _ = writeln!( &mut stderr(), "search: {}", self.time_search );
-
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
 
