@@ -24,6 +24,7 @@ pub trait Matcher {
 // macro
 // ---------------------------------------------------------------------------------------------------------------------
 
+#[cfg(all(feature = "nightly", target_arch = "x86_64"))]
 macro_rules! cmp_pat_sse (
     ( $src:expr, $pat:expr, $pat_len:expr, $pat_len_by_dq:expr, $do_mismatch:block ) => (
         {
@@ -115,6 +116,7 @@ impl QuickSearchMatcher {
         }
     }
 
+    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
         if self.use_sse {
             self.search_sub_sse   ( src, pat, qs_table, beg, end )
@@ -123,6 +125,12 @@ impl QuickSearchMatcher {
         }
     }
 
+    #[cfg(not(all(feature = "nightly", target_arch = "x86_64")))]
+    fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
+        self.search_sub_normal( src, pat, qs_table, beg, end )
+    }
+
+    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
     fn search_sub_sse( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();
@@ -274,6 +282,7 @@ impl TbmMatcher {
         }
     }
 
+    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
         if self.use_sse {
             self.search_sub_sse   ( src, pat, qs_table, md2, beg, end )
@@ -282,6 +291,12 @@ impl TbmMatcher {
         }
     }
 
+    #[cfg(not(all(feature = "nightly", target_arch = "x86_64")))]
+    fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
+        self.search_sub_normal( src, pat, qs_table, md2, beg, end )
+    }
+
+    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
     fn search_sub_sse( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();

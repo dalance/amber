@@ -1,4 +1,4 @@
-#![feature(asm)]
+#![cfg_attr(feature = "nightly", feature(asm))]
 
 extern crate docopt;
 extern crate memmap;
