@@ -11,6 +11,9 @@ path = "src/ambr.rs"
 name = "ambs"
 path = "src/ambs.rs"
 
+[features]
+sse = []
+
 [dependencies]
 docopt            = "*"
 memmap            = "*"

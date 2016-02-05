@@ -1,7 +1,7 @@
 #VERSION = $(subst \",, $(subst version =,, $(shell grep version Cargo.toml)))
 VERSION = $(patsubst "%",%, $(word 3, $(shell grep version Cargo.toml)))
 
-.PHONY: all test bench release_lnx64 release_win64 release_osx64
+.PHONY: all test bench bench_sse clean release_lnx64 release_win64 release_osx64
 
 all: test bench
 
@@ -10,6 +10,12 @@ test:
 
 bench:
 	cargo bench
+
+bench_sse:
+	cargo bench --features 'sse'
+
+clean:
+	cargo clean
 
 release_lnx32:
 	cargo build --release --target=i686-unknown-linux-gnu

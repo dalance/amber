@@ -4,12 +4,12 @@ extern crate amber;
 extern crate rand;
 extern crate test;
 
-use amber::matcher::{Matcher, BruteForceMatcher, QuickSearchMatcher, TbmMatcher};
+use amber::matcher::{Matcher, BruteForceMatcher, FjsMatcher, QuickSearchMatcher, TbmMatcher};
 use rand::{Rng, StdRng, SeedableRng};
 use test::Bencher;
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Benchmark
+// Utility
 // ---------------------------------------------------------------------------------------------------------------------
 
 fn make_src() -> Box<[u8]> {
@@ -38,123 +38,187 @@ fn make_pat( src: &[u8] ) -> Box<[u8]> {
     pat
 }
 
-#[bench]
-fn bench_brute_force_matcher( b: &mut Bencher ) {
+fn bench( b: &mut Bencher, m: &Matcher ) {
     let src = make_src();
+    let pat = make_pat( &src );
 
     b.iter( || {
-        let pat = make_pat( &src );
-        let matcher = BruteForceMatcher::new();
-        let ret = matcher.search( &*src, &*pat );
+        let ret = m.search( &*src, &*pat );
         assert!( ret.len() > 0 );
     } );
 }
 
-#[bench]
-fn bench_quick_search_matcher_thread1( b: &mut Bencher ) {
-    let src = make_src();
+// ---------------------------------------------------------------------------------------------------------------------
+// Normal
+// ---------------------------------------------------------------------------------------------------------------------
 
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = QuickSearchMatcher::new();
-        matcher.max_threads = 1;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+#[bench]
+fn normal_brute_force( b: &mut Bencher ) {
+    let m = BruteForceMatcher::new();
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_quick_search_matcher_thread4( b: &mut Bencher ) {
-    let src = make_src();
-
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = QuickSearchMatcher::new();
-        matcher.max_threads = 4;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+fn normal_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 1;
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_quick_search_matcher_thread1_sse( b: &mut Bencher ) {
-    let src = make_src();
-
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = QuickSearchMatcher::new();
-        matcher.max_threads = 1;
-        matcher.use_sse = true;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+fn normal_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 1;
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_quick_search_matcher_thread4_sse( b: &mut Bencher ) {
-    let src = make_src();
+fn normal_fjs( b: &mut Bencher ) {
+    let mut m = FjsMatcher::new();
+    m.max_threads = 1;
+    bench( b, &m );
+}
 
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = QuickSearchMatcher::new();
-        matcher.max_threads = 4;
-        matcher.use_sse = true;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+// ---------------------------------------------------------------------------------------------------------------------
+// Multithread
+// ---------------------------------------------------------------------------------------------------------------------
+
+#[bench]
+fn thread2_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 2;
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_tbm_matcher_thread1( b: &mut Bencher ) {
-    let src = make_src();
-
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = TbmMatcher::new();
-        matcher.max_threads = 1;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+fn thread2_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 2;
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_tbm_matcher_thread1_sse( b: &mut Bencher ) {
-    let src = make_src();
-
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = TbmMatcher::new();
-        matcher.max_threads = 1;
-        matcher.use_sse = true;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+fn thread2_fjs( b: &mut Bencher ) {
+    let mut m = FjsMatcher::new();
+    m.max_threads = 2;
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_tbm_matcher_thread4( b: &mut Bencher ) {
-    let src = make_src();
-
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = TbmMatcher::new();
-        matcher.max_threads = 4;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+fn thread4_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 4;
+    bench( b, &m );
 }
 
 #[bench]
-fn bench_tbm_matcher_thread4_sse( b: &mut Bencher ) {
-    let src = make_src();
+fn thread4_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 4;
+    bench( b, &m );
+}
 
-    b.iter( || {
-        let pat = make_pat( &src );
-        let mut matcher = TbmMatcher::new();
-        matcher.max_threads = 4;
-        matcher.use_sse = true;
-        let ret = matcher.search( &*src, &*pat );
-        assert!( ret.len() > 0 );
-    } );
+#[bench]
+fn thread4_fjs( b: &mut Bencher ) {
+    let mut m = FjsMatcher::new();
+    m.max_threads = 4;
+    bench( b, &m );
+}
+
+#[bench]
+fn thread8_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 8;
+    bench( b, &m );
+}
+
+#[bench]
+fn thread8_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 8;
+    bench( b, &m );
+}
+
+#[bench]
+fn thread8_fjs( b: &mut Bencher ) {
+    let mut m = FjsMatcher::new();
+    m.max_threads = 8;
+    bench( b, &m );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// SSE
+// ---------------------------------------------------------------------------------------------------------------------
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread1_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 1;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread1_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 1;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread2_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 2;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread2_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 2;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread4_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 4;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread4_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 4;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread8_quick_search( b: &mut Bencher ) {
+    let mut m = QuickSearchMatcher::new();
+    m.max_threads = 8;
+    m.use_sse = true;
+    bench( b, &m );
+}
+
+#[cfg(feature = "sse")]
+#[bench]
+fn sse_thread8_tbm( b: &mut Bencher ) {
+    let mut m = TbmMatcher::new();
+    m.max_threads = 8;
+    m.use_sse = true;
+    bench( b, &m );
 }
 

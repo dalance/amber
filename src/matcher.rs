@@ -5,6 +5,9 @@ use std::collections::HashMap;
 use std::str;
 use std::sync::mpsc;
 
+#[cfg(not(feature = "sse"))]
+use std::process;
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Matcher
 // ---------------------------------------------------------------------------------------------------------------------
@@ -24,7 +27,7 @@ pub trait Matcher {
 // macro
 // ---------------------------------------------------------------------------------------------------------------------
 
-#[cfg(all(feature = "nightly", target_arch = "x86_64"))]
+#[cfg(feature = "sse")]
 macro_rules! cmp_pat_sse (
     ( $src:expr, $pat:expr, $pat_len:expr, $pat_len_by_dq:expr, $do_mismatch:block ) => (
         {
@@ -51,6 +54,16 @@ macro_rules! cmp_pat_sse (
                     pat_rest -= 16;
                 }
             }
+        }
+    );
+);
+
+#[cfg(not(feature = "sse"))]
+macro_rules! cmp_pat_sse (
+    ( $src:expr, $pat:expr, $pat_len:expr, $pat_len_by_dq:expr, $do_mismatch:block ) => (
+        {
+            println!( "sse feature is disabled" );
+            process::exit( 1 );
         }
     );
 );
@@ -116,22 +129,8 @@ impl QuickSearchMatcher {
         }
     }
 
-    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
+    #[allow(unused_variables)]
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
-        if self.use_sse {
-            self.search_sub_sse   ( src, pat, qs_table, beg, end )
-        } else {
-            self.search_sub_normal( src, pat, qs_table, beg, end )
-        }
-    }
-
-    #[cfg(not(all(feature = "nightly", target_arch = "x86_64")))]
-    fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
-        self.search_sub_normal( src, pat, qs_table, beg, end )
-    }
-
-    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
-    fn search_sub_sse( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();
         let mut ret = Vec::new();
@@ -144,37 +143,14 @@ impl QuickSearchMatcher {
 
             let mut success = true;
 
-            cmp_pat_sse!( src[i], pat[0], pat_len, pat_len_by_dq, { success = false; break; } );
-
-            if success {
-                if MatcherUtil::check_char_boundary( src, i ) {
-                    ret.push( Match { beg: i, end: i + pat_len, sub_match: Vec::new() } );
-                    i += pat_len;
-                    continue;
-                }
-            }
-
-            if src_len <= i+pat_len { break; }
-            i += qs_table[src[i+pat_len] as usize];
-        }
-
-        ret
-    }
-
-    fn search_sub_normal( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
-        let src_len = src.len();
-        let pat_len = pat.len();
-        let mut ret = Vec::new();
-
-        let mut i = beg;
-        while i < end {
-            if src_len < i+pat_len { break; }
-
-            let mut success = true;
-            for j in 0 .. pat_len {
-                if src[i+j] != pat[j] {
-                    success = false;
-                    break;
+            if self.use_sse {
+                cmp_pat_sse!( src[i], pat[0], pat_len, pat_len_by_dq, { success = false; break; } );
+            } else {
+                for j in 0 .. pat_len {
+                    if src[i+j] != pat[j] {
+                        success = false;
+                        break;
+                    }
                 }
             }
 
@@ -192,28 +168,7 @@ impl QuickSearchMatcher {
 
         ret
     }
-
 }
-
-//impl Matcher for QuickSearchMatcher {
-//    fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
-//        let src_len = src.len();
-//        let pat_len = pat.len();
-//
-//        let mut qs_table: [usize;256] = [pat_len+1;256];
-//        for i in 0 .. pat_len {
-//            qs_table[pat[i] as usize] = pat_len - i;
-//        }
-//
-//        let mut ret = Vec::new();
-//        let tmp = self.search_sub( src, pat, &qs_table, 0, src_len );
-//        for t in tmp {
-//            ret.push( t );
-//        }
-//
-//        ret
-//    }
-//}
 
 impl Matcher for QuickSearchMatcher {
     fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
@@ -282,22 +237,8 @@ impl TbmMatcher {
         }
     }
 
-    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
+    #[allow(unused_variables)]
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
-        if self.use_sse {
-            self.search_sub_sse   ( src, pat, qs_table, md2, beg, end )
-        } else {
-            self.search_sub_normal( src, pat, qs_table, md2, beg, end )
-        }
-    }
-
-    #[cfg(not(all(feature = "nightly", target_arch = "x86_64")))]
-    fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
-        self.search_sub_normal( src, pat, qs_table, md2, beg, end )
-    }
-
-    #[cfg(all(feature = "nightly", target_arch = "x86_64"))]
-    fn search_sub_sse( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();
         let mut ret = Vec::new();
@@ -317,12 +258,14 @@ impl TbmMatcher {
                 break;
             }
 
-            cmp_pat_sse!( src[i-pat_len+1], pat[0], pat_len, pat_len_by_dq, { i += md2; continue 'outer; } );
-
-            for j in 0 .. pat_len - 1 {
-                if src[i-pat_len+1+j] != pat[j] {
-                    i += md2;
-                    continue 'outer;
+            if self.use_sse {
+                cmp_pat_sse!( src[i-pat_len+1], pat[0], pat_len, pat_len_by_dq, { i += md2; continue 'outer; } );
+            } else {
+                for j in 0 .. pat_len - 1 {
+                    if src[i-pat_len+1+j] != pat[j] {
+                        i += md2;
+                        continue 'outer;
+                    }
                 }
             }
 
@@ -337,77 +280,7 @@ impl TbmMatcher {
 
         ret
     }
-
-    fn search_sub_normal( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
-        let src_len = src.len();
-        let pat_len = pat.len();
-        let mut ret = Vec::new();
-
-        let mut i = beg + pat_len - 1;
-        'outer: while i < end {
-            let mut k = qs_table[src[i] as usize];
-            while k != 0 {
-                i += k;
-                if i >= src_len { break 'outer; }
-                k = qs_table[src[i] as usize];
-            }
-
-            if i >= end {
-                break;
-            }
-
-            for j in 0 .. pat_len - 1 {
-                if src[i-pat_len+1+j] != pat[j] {
-                    i += md2;
-                    continue 'outer;
-                }
-            }
-
-            if MatcherUtil::check_char_boundary( src, i - pat_len + 1 ) {
-                ret.push( Match { beg: i - pat_len + 1, end: i + 1, sub_match: Vec::new() } );
-                i += pat_len;
-                continue;
-            }
-
-            i += md2;
-        }
-
-        ret
-    }
-
 }
-
-/*
-impl Matcher for TbmMatcher {
-    fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
-        let src_len = src.len();
-        let pat_len = pat.len();
-
-        let mut qs_table: [usize;256] = [pat_len;256];
-        for i in 0 .. pat_len {
-            qs_table[pat[i] as usize] = pat_len - 1 - i;
-        }
-
-        let     pe: isize = pat_len as isize - 1;
-        let mut p : isize = pe - 1;
-        while p >= 0 {
-            if pat[p as usize] == pat[pe as usize] {
-                break;
-            }
-            p -= 1;
-        }
-        let md2 = ( pe - p ) as usize;
-
-        let mut ret = Vec::new();
-        let tmp = self.search_sub( src, pat, &qs_table, md2, 0, src_len );
-        for t in tmp {
-            ret.push( t );
-        }
-
-        ret
-    }
-}
-*/
 
 impl Matcher for TbmMatcher {
     fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
@@ -444,6 +317,156 @@ impl Matcher for TbmMatcher {
                     let end = src_len * ( i + 1 ) / thread_num;
                     scoped.execute( move || {
                         let tmp = self.search_sub( src, pat, &qs_table, md2, beg, end );
+                        let _ = tx.send( ( i, tmp ) );
+                    } );
+                }
+            } );
+
+            let mut rets = HashMap::new();
+            for _ in 0..thread_num {
+                let ( i, tmp ) = rx.recv().unwrap();
+                rets.insert( i, tmp );
+            }
+
+            let mut ret = Vec::new();
+            for i in 0..thread_num {
+                let tmp = rets.get( &i ).unwrap();
+                for t in tmp {
+                    ret.push( t.clone() );
+                }
+            }
+            ret
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FjsMatcher
+// ---------------------------------------------------------------------------------------------------------------------
+
+pub struct FjsMatcher {
+    pub max_threads    : usize,
+    pub size_per_thread: usize,
+    pub use_sse        : bool ,
+}
+
+impl FjsMatcher {
+    pub fn new() -> Self {
+        FjsMatcher {
+            max_threads    : 4,
+            size_per_thread: 1024 * 1024,
+            use_sse        : false,
+        }
+    }
+
+    #[allow(unused_variables)]
+    fn search_sub( &self, src: &[u8], pat: &[u8], betap: &[isize;101], delta: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+        let mut ret = Vec::new();
+
+        let mut i = 0;
+        let mut j = 0;
+        let     mp = pat_len - 1;
+        let mut ip = mp + beg;
+        let mut prev: isize = -( pat_len as isize );
+
+        while ip < end {
+            if j <= 0 {
+                if ip + 1 >= src_len {
+                    return ret;
+                }
+                while pat[mp] != src[ip] {
+                    ip += delta[src[ip+1] as usize];
+                    if ip >= src_len {
+                        return ret;
+                    }
+                }
+                j = 0;
+                i = ip - mp;
+                while j < mp && src[i] == pat[j] {
+                    i += 1;
+                    j += 1;
+                }
+                if j == mp {
+                    if MatcherUtil::check_char_boundary( src, i - mp ) {
+                        if prev + pat_len as isize <= ( i - mp ) as isize {
+                            ret.push( Match { beg: i - mp, end: i - mp + pat_len, sub_match: Vec::new() } );
+                            prev = ( i - mp ) as isize;
+                        }
+                        i += 1;
+                        j += 1;
+                    }
+                }
+                if j <= 0 {
+                    i += 1;
+                } else {
+                    j = betap[j] as usize;
+                }
+            } else {
+                while j < pat_len && src[i] == pat[j] {
+                    i += 1;
+                    j += 1;
+                }
+                if j == pat_len {
+                    if MatcherUtil::check_char_boundary( src, i - pat_len ) {
+                        if prev + pat_len as isize <= ( i - pat_len ) as isize {
+                            ret.push( Match { beg: i - pat_len, end: i, sub_match: Vec::new() } );
+                            prev = ( i - pat_len ) as isize;
+                        }
+                    }
+                }
+                j = betap[j] as usize;
+            }
+            ip = i + mp - j;
+        }
+
+        ret
+    }
+}
+
+impl Matcher for FjsMatcher {
+    fn search( &self, src: &[u8], pat: &[u8] ) -> Vec<Match> {
+        let src_len = src.len();
+        let pat_len = pat.len();
+
+        let mut betap: [isize;101] = [-1;101];
+        let mut delta: [usize;256] = [pat_len;256];
+
+        let mut i = 0;
+        let mut j = betap[0];
+        while i < pat_len {
+            while j > -1 && pat[i] != pat[j as usize] {
+                j = betap[j as usize];
+            }
+            i += 1;
+            j += 1;
+            if i < pat_len && pat[i] == pat[j as usize] {
+                betap[i] = betap[j as usize];
+            } else {
+                betap[i] = j;
+            }
+        }
+
+        for i in 0 .. pat_len {
+            delta[pat[i] as usize] = pat_len - i;
+        }
+
+        let thread_num = cmp::min( src_len / self.size_per_thread + 1, self.max_threads );
+
+        if thread_num == 1 {
+            self.search_sub( src, pat, &betap, &delta, 0, src_len )
+        } else {
+            let ( tx, rx ) = mpsc::channel();
+            let mut pool = Pool::new( thread_num as u32 );
+
+            pool.scoped( |scoped| {
+                for i in 0..thread_num {
+                    let tx  = tx.clone();
+                    let beg = src_len * i / thread_num;
+                    let end = src_len * ( i + 1 ) / thread_num;
+                    scoped.execute( move || {
+                        let tmp = self.search_sub( src, pat, &betap, &delta, beg, end );
                         let _ = tx.send( ( i, tmp ) );
                     } );
                 }
@@ -625,6 +648,7 @@ mod tests {
         test_matcher( &matcher );
     }
 
+    #[cfg(feature = "sse")]
     #[test]
     fn test_quick_search_matcher_sse() {
         let mut matcher = QuickSearchMatcher::new();
@@ -638,10 +662,17 @@ mod tests {
         test_matcher( &matcher );
     }
 
+    #[cfg(feature = "sse")]
     #[test]
     fn test_tbm_matcher_sse() {
         let mut matcher = TbmMatcher::new();
         matcher.use_sse = true;
+        test_matcher( &matcher );
+    }
+
+    #[test]
+    fn test_fjs_matcher() {
+        let matcher = FjsMatcher::new();
         test_matcher( &matcher );
     }
 
