@@ -43,3 +43,30 @@ If you input 'y', 'Y', 'Yes', the keyword is replaced. 'a', 'A', 'All' means rep
 ```
 Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):
 ```
+
+## Benchmark
+
+### Environment
+- CPU: Xeon E5-2690 @ 2.90GHz
+- MEM: 256GB
+- OS : CentOS 7.2
+
+### Data
+- source1: https://github.com/torvalds/linux ( 52998files, 2.2GB )
+- source2: https://dumps.wikimedia.org/jawiki/latest/jawiki-latest-pages-articles.xml.bz2 ( 1file, 8.5GB )
+
+### Result
+
+```
+grep --color=auto -r EXPORT_SYMBOL_GPL ./data/linux  0.27s user 0.41s system  37% cpu 1.825 total
+ag   --nogroup       EXPORT_SYMBOL_GPL ./data/linux  1.19s user 2.84s system 167% cpu 2.404 total
+pt   --nogroup       EXPORT_SYMBOL_GPL ./data/linux  3.37s user 0.94s system 228% cpu 1.883 total
+ambs                 EXPORT_SYMBOL_GPL ./data/linux  2.55s user 0.81s system 179% cpu 1.872 total
+```
+
+```
+grep --color=auto -r "Quick Search" ./data/jawiki-latest-pages-articles.xml   0.82s user  1.68s system   99% cpu  2.495 total
+ag   --nogroup       "Quick Search" ./data/jawiki-latest-pages-articles.xml  15.38s user  0.89s system  100% cpu 16.265 total
+pt   --nogroup       "Quick Search" ./data/jawiki-latest-pages-articles.xml  12.49s user  1.13s system  100% cpu 13.548 total
+ambs                 "Quick Search" ./data/jawiki-latest-pages-articles.xml   5.83s user 10.82s system 2304% cpu  0.723 total
+```
