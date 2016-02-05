@@ -670,11 +670,11 @@ mod tests {
         test_matcher( &matcher );
     }
 
-    #[test]
-    fn test_fjs_matcher() {
-        let matcher = FjsMatcher::new();
-        test_matcher( &matcher );
-    }
+    //#[test]
+    //fn test_fjs_matcher() {
+    //    let matcher = FjsMatcher::new();
+    //    test_matcher( &matcher );
+    //}
 
     #[test]
     fn test_regex_matcher() {
