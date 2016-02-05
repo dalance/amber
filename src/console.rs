@@ -5,6 +5,7 @@ use std::io;
 use std::io::Write;
 use std::process;
 use term::{Terminal, StdoutTerminal, StderrTerminal};
+use term::color::Color;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Console
@@ -53,31 +54,20 @@ impl Console {
     }
 
     pub fn write( &mut self, kind: ConsoleTextKind, val: &str ) {
-        if self.is_color {
-            let color = match kind {
-                ConsoleTextKind::Filename  => term::color::BRIGHT_GREEN,
-                ConsoleTextKind::Text      => term::color::WHITE,
-                ConsoleTextKind::MatchText => term::color::BRIGHT_YELLOW,
-                ConsoleTextKind::Other     => term::color::BRIGHT_CYAN,
-                ConsoleTextKind::Info      => term::color::BRIGHT_CYAN,
-                ConsoleTextKind::Error     => term::color::BRIGHT_RED,
-            };
-            self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
-            self.term_stderr.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
-        }
+        let color = match kind {
+            ConsoleTextKind::Filename  => term::color::BRIGHT_GREEN,
+            ConsoleTextKind::Text      => term::color::WHITE,
+            ConsoleTextKind::MatchText => term::color::BRIGHT_YELLOW,
+            ConsoleTextKind::Other     => term::color::BRIGHT_CYAN,
+            ConsoleTextKind::Info      => term::color::BRIGHT_CYAN,
+            ConsoleTextKind::Error     => term::color::BRIGHT_RED,
+        };
 
         match kind {
-            ConsoleTextKind::Error => write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
-            ConsoleTextKind::Info  => write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
-            _                      => write!( self.term_stdout, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } ),
+            ConsoleTextKind::Error => self.write_stderr( val, color ),
+            ConsoleTextKind::Info  => self.write_stderr( val, color ),
+            _                      => self.write_stdout( val, color ),
         }
-
-        if self.is_color {
-            self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-            self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-        }
-        let _ = io::stdout().flush();
-        let _ = io::stderr().flush();
     }
 
     pub fn write_match_line( &mut self, src: &[u8], m: &Match ) {
@@ -102,4 +92,33 @@ impl Console {
         }
         self.write( ConsoleTextKind::Other, "\n" );
     }
+
+    fn write_stdout( &mut self, val: &str, color: Color ) {
+        if self.is_color {
+            self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+        }
+
+        write!( self.term_stdout, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } );
+
+        if self.is_color {
+            self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        }
+
+        let _ = io::stdout().flush();
+    }
+
+    fn write_stderr( &mut self, val: &str, color: Color ) {
+        if self.is_color {
+            self.term_stderr.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+        }
+
+        write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } );
+
+        if self.is_color {
+            self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        }
+
+        let _ = io::stderr().flush();
+    }
+
 }
