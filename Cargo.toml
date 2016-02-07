@@ -20,16 +20,16 @@ path = "src/ambs.rs"
 sse = []
 
 [dependencies]
-docopt            = "*"
-memmap            = "*"
-num_cpus          = "*"
-regex             = "*"
-rand              = "*"
-rustc-serialize   = "*"
-scoped_threadpool = "*"
-tempfile          = "*"
-term              = "*"
-time              = "*"
+docopt            = "0.6.78"
+memmap            = "0.2.3"
+num_cpus          = "0.2.10"
+regex             = "0.1.48"
+rand              = "0.3.13"
+rustc-serialize   = "0.3.16"
+scoped_threadpool = "0.1.6"
+tempfile          = "2.0.1"
+term              = "0.4.4"
+time              = "0.1.34"
 
 [profile.dev]
 opt-level        = 0
