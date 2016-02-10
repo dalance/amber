@@ -70,6 +70,11 @@ impl Console {
         }
     }
 
+    pub fn flush( &mut self ) {
+        let _ = io::stdout().flush();
+        let _ = io::stderr().flush();
+    }
+
     pub fn write_match_line( &mut self, src: &[u8], m: &Match ) {
         let mut beg = m.beg;
         let mut end = m.end;
@@ -104,7 +109,7 @@ impl Console {
             self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
         }
 
-        let _ = io::stdout().flush();
+        //let _ = io::stdout().flush();
     }
 
     fn write_stderr( &mut self, val: &str, color: Color ) {
@@ -118,7 +123,7 @@ impl Console {
             self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
         }
 
-        let _ = io::stderr().flush();
+        //let _ = io::stderr().flush();
     }
 
 }

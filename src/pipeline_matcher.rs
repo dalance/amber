@@ -1,6 +1,8 @@
 use matcher::{Match, Matcher};
 use memmap::{Mmap, Protection};
-use std::io::Error;
+use pipeline_finder::PathInfo;
+use std::io::{Error, Read};
+use std::fs::File;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use time;
@@ -12,12 +14,13 @@ use util::{catch, decode_error, PipelineInfo};
 
 #[derive(Debug,Clone)]
 pub struct PathMatch {
-    pub path: PathBuf,
+    pub id     : usize     ,
+    pub path   : PathBuf   ,
     pub matches: Vec<Match>,
 }
 
 pub trait PipelineMatcher {
-    fn search( &mut self, matcher: &Matcher, keyword: &[u8], rx: Receiver<PipelineInfo<PathBuf>>, tx: Sender<PipelineInfo<PathMatch>> );
+    fn search( &mut self, matcher: &Matcher, keyword: &[u8], rx: Receiver<PipelineInfo<PathInfo>>, tx: Sender<PipelineInfo<PathMatch>> );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -49,13 +52,21 @@ impl SimplePipelineMatcher {
         }
     }
 
-    fn search_path( &mut self, matcher: &Matcher, keyword: &[u8], path: PathBuf ) -> PathMatch {
-        let path_org = path.clone();
+    fn search_path( &mut self, matcher: &Matcher, keyword: &[u8], info: PathInfo ) -> PathMatch {
+        let path_org = info.path.clone();
 
         let result = catch::<_, PathMatch, Error> ( || {
 
-            let mmap = try!( Mmap::open_path( &path, Protection::Read ) );
-            let src  = unsafe { mmap.as_slice() };
+            let mmap;
+            let mut buf = Vec::new();
+            let src = if info.len > 1024 * 1024 {
+                mmap = try!( Mmap::open_path( &info.path, Protection::Read ) );
+                unsafe { mmap.as_slice() }
+            } else {
+                let mut f = try!( File::open( &info.path ) );
+                try!( f.read_to_end( &mut buf ) );
+                &buf[..]
+            };
 
             if self.skip_binary {
                 let mut is_binary = false;
@@ -67,36 +78,37 @@ impl SimplePipelineMatcher {
                 }
                 if is_binary {
                     if self.print_skipped {
-                        self.infos.push( format!( "Skipped: {:?} ( binary file )\n", path ) );
+                        self.infos.push( format!( "Skipped: {:?} ( binary file )\n", info.path ) );
                     }
-                    return Ok( PathMatch { path: path.clone(), matches: Vec::new() } )
+                    return Ok( PathMatch { id: info.id, path: info.path.clone(), matches: Vec::new() } )
                 }
             }
 
             let ret = matcher.search( src, keyword );
 
-            Ok( PathMatch { path: path.clone(), matches: ret } )
+            Ok( PathMatch { id: info.id, path: info.path.clone(), matches: ret } )
         } );
 
         match result {
             Ok ( x ) => x,
             Err( e ) => {
                 self.errors.push( format!( "Error: {} @ {:?}\n", decode_error( e.kind() ), path_org ) );
-                PathMatch { path: path.clone(), matches: Vec::new() }
+                PathMatch { id: info.id, path: info.path.clone(), matches: Vec::new() }
             },
         }
     }
 }
 
 impl PipelineMatcher for SimplePipelineMatcher {
-    fn search( &mut self, matcher: &Matcher, keyword: &[u8], rx: Receiver<PipelineInfo<PathBuf>>, tx: Sender<PipelineInfo<PathMatch>> ) {
+    fn search( &mut self, matcher: &Matcher, keyword: &[u8], rx: Receiver<PipelineInfo<PathInfo>>, tx: Sender<PipelineInfo<PathMatch>> ) {
         loop {
             match rx.recv() {
                 Ok( PipelineInfo::Ok( p ) ) => {
                     let beg = time::precise_time_ns();
 
                     let ret = self.search_path( matcher, keyword, p );
-                    if !ret.matches.is_empty() { let _ = tx.send( PipelineInfo::Ok( ret ) ); }
+                    //if !ret.matches.is_empty() { let _ = tx.send( PipelineInfo::Ok( ret ) ); }
+                    let _ = tx.send( PipelineInfo::Ok( ret ) );
 
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;

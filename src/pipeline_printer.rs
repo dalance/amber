@@ -22,6 +22,7 @@ pub struct SimplePipelinePrinter {
     pub is_color    : bool,
     pub print_file  : bool,
     pub print_column: bool,
+    pub wait_count  : usize,
     pub infos       : Vec<String>,
     pub errors      : Vec<String>,
     console         : Console,
@@ -36,6 +37,7 @@ impl SimplePipelinePrinter {
             is_color    : true,
             print_file  : true,
             print_column: false,
+            wait_count  : 1,
             infos       : Vec::new(),
             errors      : Vec::new(),
             console     : Console::new(),
@@ -46,6 +48,7 @@ impl SimplePipelinePrinter {
     }
 
     fn print_match( &mut self, pm: PathMatch ) {
+        if pm.matches.is_empty() { return; }
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error> ( || {
@@ -85,6 +88,7 @@ impl SimplePipelinePrinter {
 
 impl PipelinePrinter for SimplePipelinePrinter {
     fn print( &mut self, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
+        let mut count_end = 0;
         loop {
             match rx.recv() {
                 Ok( PipelineInfo::Ok( pm ) ) => {
@@ -104,6 +108,9 @@ impl PipelinePrinter for SimplePipelinePrinter {
                     let _ = tx.send( PipelineInfo::Begin );
                 },
                 Ok( PipelineInfo::End ) => {
+                    count_end += 1;
+                    if count_end < self.wait_count { continue; }
+
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
 

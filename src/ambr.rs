@@ -5,7 +5,6 @@ extern crate rustc_serialize;
 
 use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{Matcher, RegexMatcher, QuickSearchMatcher, TbmMatcher};
-use amber::pipeline_filter::{PipelineFilter, SimplePipelineFilter};
 use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
 use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
 use amber::pipeline_replacer::{PipelineReplacer, SimplePipelineReplacer};
@@ -155,22 +154,19 @@ fn main() {
 
     let ( finder_in_tx   , finder_in_rx    ) = mpsc::channel();
     let ( finder_out_tx  , finder_out_rx   ) = mpsc::channel();
-    let ( filter_in_tx   , filter_in_rx    ) = mpsc::channel();
-    let ( filter_out_tx  , filter_out_rx   ) = mpsc::channel();
     let ( matcher_in_tx  , matcher_in_rx   ) = mpsc::channel();
     let ( matcher_out_tx , matcher_out_rx  ) = mpsc::channel();
     let ( replacer_in_tx , replacer_in_rx  ) = mpsc::channel();
     let ( replacer_out_tx, replacer_out_rx ) = mpsc::channel();
 
     let mut finder   = SimplePipelineFinder::new();
-    let mut filter   = SimplePipelineFilter::new();
     let mut matcher  = SimplePipelineMatcher::new();
     let mut replacer = SimplePipelineReplacer::new();
 
     finder.is_recursive        = !args.flag_no_recursive;
     finder.follow_symlink      = !args.flag_no_symlink;
-    filter.skip_vcs            = !args.flag_no_skip_vcs;
-    filter.print_skipped       = args.flag_skipped;
+    finder.skip_vcs            = !args.flag_no_skip_vcs;
+    finder.print_skipped       = args.flag_skipped;
     matcher.skip_binary        = !args.flag_binary;
     matcher.print_skipped      = args.flag_skipped;
     matcher.binary_check_bytes = args.flag_bin_check_bytes;
@@ -187,10 +183,6 @@ fn main() {
 
     let _ = thread::Builder::new().name( "finder".to_string() ).spawn( move || {
         finder.find( finder_in_rx, finder_out_tx );
-    } );
-
-    let _ = thread::Builder::new().name( "filter".to_string() ).spawn( move || {
-        filter.filter( filter_in_rx, filter_out_tx );
     } );
 
     let _ = thread::Builder::new().name( "matcher".to_string() ).spawn( move || {
@@ -224,27 +216,18 @@ fn main() {
 
     let mut time_finder_bsy   = 0;
     let mut time_finder_all   = 0;
-    let mut time_filter_bsy   = 0;
-    let mut time_filter_all   = 0;
     let mut time_matcher_bsy  = 0;
     let mut time_matcher_all  = 0;
     let mut time_replacer_bsy = 0;
     let mut time_replacer_all = 0;
 
     let mut count_finder  = 0;
-    let mut count_filter  = 0;
     let mut count_matcher = 0;
 
     loop {
         match finder_out_rx.try_recv() {
             Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_finder_bsy = t0; time_finder_all = t1; },
-            Ok ( PipelineInfo::Ok  ( x      ) ) => { count_finder += 1; let _ = filter_in_tx.send( PipelineInfo::Ok( x ) ); },
-            Ok ( i                            ) => { let _ = filter_in_tx.send( i ); },
-            Err( _                            ) => (),
-        }
-        match filter_out_rx.try_recv() {
-            Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_filter_bsy = t0; time_filter_all = t1; },
-            Ok ( PipelineInfo::Ok  ( x      ) ) => { count_filter += 1; let _ = matcher_in_tx.send( PipelineInfo::Ok( x ) ); },
+            Ok ( PipelineInfo::Ok  ( x      ) ) => { count_finder += 1; let _ = matcher_in_tx.send( PipelineInfo::Ok( x ) ); },
             Ok ( i                            ) => { let _ = matcher_in_tx.send( i ); },
             Err( _                            ) => (),
         }
@@ -270,8 +253,6 @@ fn main() {
 
     let sec_finder_bsy   = time_finder_bsy   as f64 / 1000000000.0;
     let sec_finder_all   = time_finder_all   as f64 / 1000000000.0;
-    let sec_filter_bsy   = time_filter_bsy   as f64 / 1000000000.0;
-    let sec_filter_all   = time_filter_all   as f64 / 1000000000.0;
     let sec_matcher_bsy  = time_matcher_bsy  as f64 / 1000000000.0;
     let sec_matcher_all  = time_matcher_all  as f64 / 1000000000.0;
     let sec_replacer_bsy = time_replacer_bsy as f64 / 1000000000.0;
@@ -282,12 +263,10 @@ fn main() {
         console.write( ConsoleTextKind::Info, &format!( "  Max threads: {}\n\n" , args.flag_max_threads ) );
         console.write( ConsoleTextKind::Info, &format!( "  Consumed time ( busy / total )\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Find     : {}s / {}s\n"  , sec_finder_bsy  , sec_finder_all   ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Filter   : {}s / {}s\n"  , sec_filter_bsy  , sec_filter_all   ) );
         console.write( ConsoleTextKind::Info, &format!( "    Match    : {}s / {}s\n"  , sec_matcher_bsy , sec_matcher_all  ) );
         console.write( ConsoleTextKind::Info, &format!( "    Replace  : {}s / {}s\n"  , sec_replacer_bsy, sec_replacer_all ) );
         console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Filtered : {}\n"   , count_filter  ) );
         console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );
     }
 }

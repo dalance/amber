@@ -5,7 +5,6 @@ extern crate rustc_serialize;
 
 use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{Matcher, RegexMatcher, QuickSearchMatcher, TbmMatcher};
-use amber::pipeline_filter::{PipelineFilter, SimplePipelineFilter};
 use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
 use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
 use amber::pipeline_printer::{PipelinePrinter, SimplePipelinePrinter};
@@ -101,7 +100,7 @@ fn main() {
     let mut console = Console::new();
     console.is_color = !args.flag_no_color;
 
-    // - Set base path, keyword and replacemente -------------------------------
+    // - Set base path, keyword and replacement --------------------------------
     let mut base_paths:Vec<PathBuf> = Vec::new();
     if args.arg_paths.is_empty() {
         base_paths.push( PathBuf::from( "./" ) );
@@ -135,59 +134,65 @@ fn main() {
     // Pipeline Construct
     // ---------------------------------------------------------------------------------------------
 
-    let ( finder_in_tx   , finder_in_rx    ) = mpsc::channel();
-    let ( finder_out_tx  , finder_out_rx   ) = mpsc::channel();
-    let ( filter_in_tx   , filter_in_rx    ) = mpsc::channel();
-    let ( filter_out_tx  , filter_out_rx   ) = mpsc::channel();
-    let ( matcher_in_tx  , matcher_in_rx   ) = mpsc::channel();
-    let ( matcher_out_tx , matcher_out_rx  ) = mpsc::channel();
-    let ( printer_in_tx  , printer_in_rx   ) = mpsc::channel();
-    let ( printer_out_tx , printer_out_rx  ) = mpsc::channel();
+    let matcher_num = 8;
 
-    let mut finder   = SimplePipelineFinder::new();
-    let mut filter   = SimplePipelineFilter::new();
-    let mut matcher  = SimplePipelineMatcher::new();
-    let mut printer  = SimplePipelinePrinter::new();
+    let ( finder_in_tx  , finder_in_rx   ) = mpsc::channel();
+    let ( finder_out_tx , finder_out_rx  ) = mpsc::channel();
+    let ( printer_in_tx , printer_in_rx  ) = mpsc::channel();
+    let ( printer_out_tx, printer_out_rx ) = mpsc::channel();
 
-    finder.is_recursive        = !args.flag_no_recursive;
-    finder.follow_symlink      = !args.flag_no_symlink;
-    filter.skip_vcs            = !args.flag_no_skip_vcs;
-    filter.print_skipped       = args.flag_skipped;
-    matcher.skip_binary        = !args.flag_binary;
-    matcher.print_skipped      = args.flag_skipped;
-    matcher.binary_check_bytes = args.flag_bin_check_bytes;
-    printer.is_color           = !args.flag_no_color;
-    printer.print_file         = !args.flag_no_file;
-    printer.print_column       = args.flag_column;
+    let mut matcher_in_tx  = Vec::new();
+    let mut matcher_out_rx = Vec::new();
 
-    let max_threads     = cmp::max( args.flag_max_threads - 4, 1 );
-    let size_per_thread = args.flag_size_per_thread;
-    let regex           = args.flag_regex;
-    let tbm             = args.flag_tbm;
-    let sse             = args.flag_sse;
+    let mut finder  = SimplePipelineFinder::new();
+    let mut printer = SimplePipelinePrinter::new();
+
+    finder.is_recursive   = !args.flag_no_recursive;
+    finder.follow_symlink = !args.flag_no_symlink;
+    finder.skip_vcs       = !args.flag_no_skip_vcs;
+    finder.print_skipped  = args.flag_skipped;
+    printer.is_color      = !args.flag_no_color;
+    printer.print_file    = !args.flag_no_file;
+    printer.print_column  = args.flag_column;
+    printer.wait_count    = matcher_num;
 
     let _ = thread::Builder::new().name( "finder".to_string() ).spawn( move || {
         finder.find( finder_in_rx, finder_out_tx );
     } );
 
-    let _ = thread::Builder::new().name( "filter".to_string() ).spawn( move || {
-        filter.filter( filter_in_rx, filter_out_tx );
-    } );
+    for i in 0..matcher_num {
+        let keyword = keyword.clone();
+        let ( in_tx , in_rx  ) = mpsc::channel();
+        let ( out_tx, out_rx ) = mpsc::channel();
+        matcher_in_tx .push( in_tx  );
+        matcher_out_rx.push( out_rx );
 
-    let _ = thread::Builder::new().name( "matcher".to_string() ).spawn( move || {
-        let mut m_qs    = QuickSearchMatcher::new();
-        let mut m_tbm   = TbmMatcher::new();
-        let     m_regex = RegexMatcher::new();
-        m_qs.max_threads      = max_threads;
-        m_qs.size_per_thread  = size_per_thread;
-        m_qs.use_sse          = sse;
-        m_tbm.max_threads     = max_threads;
-        m_tbm.size_per_thread = size_per_thread;
-        m_tbm.use_sse         = sse;
-        let m: &Matcher = if regex { &m_regex } else if tbm { &m_tbm } else { &m_qs };
+        let mut matcher = SimplePipelineMatcher::new();
+        matcher.skip_binary        = !args.flag_binary;
+        matcher.print_skipped      = args.flag_skipped;
+        matcher.binary_check_bytes = args.flag_bin_check_bytes;
 
-        matcher.search( m, &keyword, matcher_in_rx, matcher_out_tx );
-    } );
+        let max_threads     = cmp::max( args.flag_max_threads - 4, 1 );
+        let size_per_thread = args.flag_size_per_thread;
+        let use_regex       = args.flag_regex;
+        let use_tbm         = args.flag_tbm;
+        let use_sse         = args.flag_sse;
+
+        let _ = thread::Builder::new().name( "matcher".to_string() ).spawn( move || {
+            let mut m_qs    = QuickSearchMatcher::new();
+            let mut m_tbm   = TbmMatcher::new();
+            let     m_regex = RegexMatcher::new();
+            m_qs.max_threads      = max_threads;
+            m_qs.size_per_thread  = size_per_thread;
+            m_qs.use_sse          = use_sse;
+            m_tbm.max_threads     = max_threads;
+            m_tbm.size_per_thread = size_per_thread;
+            m_tbm.use_sse         = use_sse;
+            let m: &Matcher = if use_regex { &m_regex } else if use_tbm { &m_tbm } else { &m_qs };
+
+            matcher.search( m, &keyword, in_rx, out_tx );
+        } );
+    }
 
     let _ = thread::Builder::new().name( "printer".to_string() ).spawn( move || {
         printer.print( printer_in_rx, printer_out_tx );
@@ -205,35 +210,41 @@ fn main() {
 
     let mut time_finder_bsy   = 0;
     let mut time_finder_all   = 0;
-    let mut time_filter_bsy   = 0;
-    let mut time_filter_all   = 0;
-    let mut time_matcher_bsy  = 0;
-    let mut time_matcher_all  = 0;
     let mut time_printer_bsy  = 0;
     let mut time_printer_all  = 0;
 
+    let mut time_matcher_bsy = Vec::new();
+    let mut time_matcher_all = Vec::new();
+    for _ in 0..matcher_num {
+        time_matcher_bsy.push( 0 );
+        time_matcher_all.push( 0 );
+    }
+
     let mut count_finder  = 0;
-    let mut count_filter  = 0;
     let mut count_matcher = 0;
 
     loop {
         match finder_out_rx.try_recv() {
             Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_finder_bsy = t0; time_finder_all = t1; },
-            Ok ( PipelineInfo::Ok  ( x      ) ) => { count_finder += 1; let _ = filter_in_tx.send( PipelineInfo::Ok( x ) ); },
-            Ok ( i                            ) => { let _ = filter_in_tx.send( i ); },
+            Ok ( PipelineInfo::Ok  ( x      ) ) => {
+                let _ = matcher_in_tx[count_finder % matcher_num].send( PipelineInfo::Ok( x ) );
+                count_finder += 1;
+            },
+            Ok ( PipelineInfo::End            ) => {
+                for tx in &matcher_in_tx {
+                    tx.send( PipelineInfo::End );
+                }
+            },
+            Ok ( i                            ) => { let _ = matcher_in_tx[0].send( i ); },
             Err( _                            ) => (),
         }
-        match filter_out_rx.try_recv() {
-            Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_filter_bsy = t0; time_filter_all = t1; },
-            Ok ( PipelineInfo::Ok  ( x      ) ) => { count_filter += 1; let _ = matcher_in_tx.send( PipelineInfo::Ok( x ) ); },
-            Ok ( i                            ) => { let _ = matcher_in_tx.send( i ); },
-            Err( _                            ) => (),
-        }
-        match matcher_out_rx.try_recv() {
-            Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_matcher_bsy = t0; time_matcher_all = t1; },
-            Ok ( PipelineInfo::Ok  ( x      ) ) => { count_matcher += 1; let _ = printer_in_tx.send( PipelineInfo::Ok( x ) ); },
-            Ok ( i                            ) => { let _ = printer_in_tx.send( i ); },
-            Err( _                            ) => (),
+        for i in 0..matcher_num {
+            match matcher_out_rx[i].try_recv() {
+                Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_matcher_bsy[i] = t0; time_matcher_all[i] = t1; },
+                Ok ( PipelineInfo::Ok  ( x      ) ) => { count_matcher += 1; let _ = printer_in_tx.send( PipelineInfo::Ok( x ) ); },
+                Ok ( i                            ) => { let _ = printer_in_tx.send( i ); },
+                Err( _                            ) => (),
+            }
         }
         match printer_out_rx.try_recv() {
             Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_printer_bsy = t0; time_printer_all = t1; },
@@ -249,26 +260,29 @@ fn main() {
     // Pipeline Flow
     // ---------------------------------------------------------------------------------------------
 
-    let sec_finder_bsy   = time_finder_bsy   as f64 / 1000000000.0;
-    let sec_finder_all   = time_finder_all   as f64 / 1000000000.0;
-    let sec_filter_bsy   = time_filter_bsy   as f64 / 1000000000.0;
-    let sec_filter_all   = time_filter_all   as f64 / 1000000000.0;
-    let sec_matcher_bsy  = time_matcher_bsy  as f64 / 1000000000.0;
-    let sec_matcher_all  = time_matcher_all  as f64 / 1000000000.0;
-    let sec_printer_bsy  = time_printer_bsy  as f64 / 1000000000.0;
-    let sec_printer_all  = time_printer_all  as f64 / 1000000000.0;
+    let sec_finder_bsy  = time_finder_bsy   as f64 / 1000000000.0;
+    let sec_finder_all  = time_finder_all   as f64 / 1000000000.0;
+    let sec_printer_bsy = time_printer_bsy  as f64 / 1000000000.0;
+    let sec_printer_all = time_printer_all  as f64 / 1000000000.0;
+
+    let mut sec_matcher_bsy = Vec::new();
+    let mut sec_matcher_all = Vec::new();
+    for i in 0..matcher_num {
+        sec_matcher_bsy.push( time_matcher_bsy[i] as f64 / 1000000000.0 );
+        sec_matcher_all.push( time_matcher_all[i] as f64 / 1000000000.0 );
+    }
 
     if args.flag_statistics {
         console.write( ConsoleTextKind::Info, &format!( "\nStatistics\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "  Max threads: {}\n\n" , args.flag_max_threads ) );
         console.write( ConsoleTextKind::Info, &format!( "  Consumed time ( busy / total )\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Find     : {}s / {}s\n"  , sec_finder_bsy  , sec_finder_all   ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Filter   : {}s / {}s\n"  , sec_filter_bsy  , sec_filter_all   ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Match    : {}s / {}s\n"  , sec_matcher_bsy , sec_matcher_all  ) );
+        for i in 0..matcher_num {
+        console.write( ConsoleTextKind::Info, &format!( "    Match{}  : {}s / {}s\n"  , i, sec_matcher_bsy[i], sec_matcher_all[i] ) );
+        }
         console.write( ConsoleTextKind::Info, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
         console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Filtered : {}\n"   , count_filter  ) );
         console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );
     }
 }
