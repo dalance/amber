@@ -146,6 +146,7 @@ impl PipelineMatcher for SimplePipelineMatcher {
 mod tests {
     use super::*;
     use matcher::QuickSearchMatcher;
+    use pipeline_finder::PathInfo;
     use std::path::PathBuf;
     use std::thread;
     use std::sync::mpsc;
@@ -163,9 +164,9 @@ mod tests {
         } );
 
         let _ = in_tx.send( PipelineInfo::Begin );
-        let _ = in_tx.send( PipelineInfo::Ok( PathBuf::from( "./src/ambs.rs" ) ) );
-        let _ = in_tx.send( PipelineInfo::Ok( PathBuf::from( "./src/ambr.rs" ) ) );
-        let _ = in_tx.send( PipelineInfo::Ok( PathBuf::from( "./src/util.rs" ) ) );
+        let _ = in_tx.send( PipelineInfo::Ok( PathInfo{ id: 0, path: PathBuf::from( "./src/ambs.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::Ok( PathInfo{ id: 1, path: PathBuf::from( "./src/ambr.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::Ok( PathInfo{ id: 2, path: PathBuf::from( "./src/util.rs" ), len: 1 } ) );
         let _ = in_tx.send( PipelineInfo::End );
 
         let mut ret = Vec::new();
@@ -183,7 +184,7 @@ mod tests {
         for r in ret {
             if r.path == PathBuf::from( "./src/ambs.rs" ) { assert!( !r.matches.is_empty() ); }
             if r.path == PathBuf::from( "./src/ambr.rs" ) { assert!( !r.matches.is_empty() ); }
-            if r.path == PathBuf::from( "./src/util.rs" ) { assert!( false                 ); }
+            if r.path == PathBuf::from( "./src/util.rs" ) { assert!( r.matches.is_empty()  ); }
         }
 
         assert!( time_bsy != 0 );

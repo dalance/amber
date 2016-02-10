@@ -203,13 +203,54 @@ mod tests {
             }
         }
 
-        assert!( ret.contains( &PathBuf::from( "./Cargo.toml"         ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/ambr.rs"        ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/ambs.rs"        ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/console.rs"     ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/lib.rs"         ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/matcher.rs"     ) ) );
-        assert!( ret.contains( &PathBuf::from( "./src/util.rs"        ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./Cargo.toml"     ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/ambr.rs"    ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/ambs.rs"    ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/console.rs" ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/lib.rs"     ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/matcher.rs" ) ) );
+        assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/util.rs"    ) ) );
+        assert!( !ret.iter().any( |x| x.path == PathBuf::from( "./.git/config"    ) ) );
+
+        assert!( time_bsy != 0 );
+        assert!( time_all != 0 );
+        assert!( time_bsy < time_all );
+    }
+
+    #[test]
+    fn test_simple_pipeline_finder_not_skip_vcs() {
+        let mut finder = SimplePipelineFinder::new();
+        finder.skip_vcs = false;
+
+        let ( in_tx , in_rx  ) = mpsc::channel();
+        let ( out_tx, out_rx ) = mpsc::channel();
+        thread::spawn( move || {
+            finder.find( in_rx, out_tx );
+        } );
+        let _ = in_tx.send( PipelineInfo::Begin );
+        let _ = in_tx.send( PipelineInfo::Ok( PathBuf::from( "./" ) ) );
+        let _ = in_tx.send( PipelineInfo::End );
+
+        let mut ret = Vec::new();
+        let mut time_bsy = 0;
+        let mut time_all = 0;
+        loop {
+            match out_rx.recv().unwrap() {
+                PipelineInfo::Ok  ( x      ) => ret.push( x ),
+                PipelineInfo::Time( t0, t1 ) => { time_bsy = t0; time_all = t1; },
+                PipelineInfo::End            => break,
+                _                            => (),
+            }
+        }
+
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./Cargo.toml"     ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/ambr.rs"    ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/ambs.rs"    ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/console.rs" ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/lib.rs"     ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/matcher.rs" ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/util.rs"    ) ) );
+        assert!( ret.iter().any( |x| x.path == PathBuf::from( "./.git/config"    ) ) );
 
         assert!( time_bsy != 0 );
         assert!( time_all != 0 );
