@@ -7,10 +7,10 @@ use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{Matcher, RegexMatcher, QuickSearchMatcher, TbmMatcher};
 use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
 use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
+use amber::pipeline_queue::{PipelineQueue, SimplePipelineQueue};
 use amber::pipeline_printer::{PipelinePrinter, SimplePipelinePrinter};
 use amber::util::{decode_error, read_from_file, PipelineInfo};
 use docopt::Docopt;
-use std::cmp;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process;
@@ -46,6 +46,7 @@ Options:
     --no-color                 Disable colored output
     --no-file                  Disable filename output
     --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
+    --no-skip-gitignore        Disable .gitignore skip
     -h --help                  Show this message
     -v --version               Show version
 
@@ -59,25 +60,26 @@ static VERSION: &'static str = env!( "CARGO_PKG_VERSION" );
 
 #[derive(RustcDecodable, Debug)]
 struct Args {
-    arg_keyword         : String,
-    arg_paths           : Vec<String>,
-    flag_key_file       : Option<String>,
-    flag_max_threads    : usize,
-    flag_size_per_thread: usize,
-    flag_bin_check_bytes: usize,
-    flag_regex          : bool,
-    flag_column         : bool,
-    flag_binary         : bool,
-    flag_statistics     : bool,
-    flag_skipped        : bool,
-    flag_no_progress    : bool,
-    flag_no_recursive   : bool,
-    flag_no_symlink     : bool,
-    flag_no_color       : bool,
-    flag_no_file        : bool,
-    flag_no_skip_vcs    : bool,
-    flag_tbm            : bool,
-    flag_sse            : bool,
+    arg_keyword           : String,
+    arg_paths             : Vec<String>,
+    flag_key_file         : Option<String>,
+    flag_max_threads      : usize,
+    flag_size_per_thread  : usize,
+    flag_bin_check_bytes  : usize,
+    flag_regex            : bool,
+    flag_column           : bool,
+    flag_binary           : bool,
+    flag_statistics       : bool,
+    flag_skipped          : bool,
+    flag_no_progress      : bool,
+    flag_no_recursive     : bool,
+    flag_no_symlink       : bool,
+    flag_no_color         : bool,
+    flag_no_file          : bool,
+    flag_no_skip_vcs      : bool,
+    flag_no_skip_gitignore: bool,
+    flag_tbm              : bool,
+    flag_sse              : bool,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -94,7 +96,7 @@ fn main() {
     // - Create config from Docopt ---------------------------------------------
     let version = format!( "ambs version {}", VERSION );
 
-    let usage = String::from( USAGE ).replace( "num_cpus", &format!( "{}", num_cpus::get() * 4 ) );
+    let usage = String::from( USAGE ).replace( "num_cpus", &format!( "{}", num_cpus::get() ) );
     let args: Args = Docopt::new( usage ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );
 
     let mut console = Console::new();
@@ -134,10 +136,12 @@ fn main() {
     // Pipeline Construct
     // ---------------------------------------------------------------------------------------------
 
-    let matcher_num = 8;
+    let matcher_num = args.flag_max_threads;
 
     let ( finder_in_tx  , finder_in_rx   ) = mpsc::channel();
     let ( finder_out_tx , finder_out_rx  ) = mpsc::channel();
+    let ( queue_in_tx   , queue_in_rx    ) = mpsc::channel();
+    let ( queue_out_tx  , queue_out_rx   ) = mpsc::channel();
     let ( printer_in_tx , printer_in_rx  ) = mpsc::channel();
     let ( printer_out_tx, printer_out_rx ) = mpsc::channel();
 
@@ -145,22 +149,23 @@ fn main() {
     let mut matcher_out_rx = Vec::new();
 
     let mut finder  = SimplePipelineFinder::new();
+    let mut queue   = SimplePipelineQueue::new();
     let mut printer = SimplePipelinePrinter::new();
 
     finder.is_recursive   = !args.flag_no_recursive;
     finder.follow_symlink = !args.flag_no_symlink;
     finder.skip_vcs       = !args.flag_no_skip_vcs;
+    finder.skip_gitignore = !args.flag_no_skip_gitignore;
     finder.print_skipped  = args.flag_skipped;
     printer.is_color      = !args.flag_no_color;
     printer.print_file    = !args.flag_no_file;
     printer.print_column  = args.flag_column;
-    printer.wait_count    = matcher_num;
 
     let _ = thread::Builder::new().name( "finder".to_string() ).spawn( move || {
         finder.find( finder_in_rx, finder_out_tx );
     } );
 
-    for i in 0..matcher_num {
+    for _ in 0..matcher_num {
         let keyword = keyword.clone();
         let ( in_tx , in_rx  ) = mpsc::channel();
         let ( out_tx, out_rx ) = mpsc::channel();
@@ -172,7 +177,7 @@ fn main() {
         matcher.print_skipped      = args.flag_skipped;
         matcher.binary_check_bytes = args.flag_bin_check_bytes;
 
-        let max_threads     = cmp::max( args.flag_max_threads - 4, 1 );
+        let max_threads     = args.flag_max_threads;
         let size_per_thread = args.flag_size_per_thread;
         let use_regex       = args.flag_regex;
         let use_tbm         = args.flag_tbm;
@@ -194,6 +199,10 @@ fn main() {
         } );
     }
 
+    let _ = thread::Builder::new().name( "queue".to_string() ).spawn( move || {
+        queue.exec( queue_in_rx, queue_out_tx );
+    } );
+
     let _ = thread::Builder::new().name( "printer".to_string() ).spawn( move || {
         printer.print( printer_in_rx, printer_out_tx );
     } );
@@ -202,16 +211,18 @@ fn main() {
     // Pipeline Flow
     // ---------------------------------------------------------------------------------------------
 
-    let _ = finder_in_tx.send( PipelineInfo::Begin );
+    let _ = finder_in_tx.send( PipelineInfo::Beg( 0 ) );
     for p in base_paths {
         let _ = finder_in_tx.send( PipelineInfo::Ok( p ) );
     }
-    let _ = finder_in_tx.send( PipelineInfo::End );
+    let _ = finder_in_tx.send( PipelineInfo::End( 1 ) );
 
-    let mut time_finder_bsy   = 0;
-    let mut time_finder_all   = 0;
-    let mut time_printer_bsy  = 0;
-    let mut time_printer_all  = 0;
+    let mut time_finder_bsy  = 0;
+    let mut time_finder_all  = 0;
+    let mut time_queue_bsy   = 0;
+    let mut time_queue_all   = 0;
+    let mut time_printer_bsy = 0;
+    let mut time_printer_all = 0;
 
     let mut time_matcher_bsy = Vec::new();
     let mut time_matcher_all = Vec::new();
@@ -225,32 +236,40 @@ fn main() {
 
     loop {
         match finder_out_rx.try_recv() {
-            Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_finder_bsy = t0; time_finder_all = t1; },
-            Ok ( PipelineInfo::Ok  ( x      ) ) => {
+            Ok ( PipelineInfo::Ok( x ) ) => {
                 let _ = matcher_in_tx[count_finder % matcher_num].send( PipelineInfo::Ok( x ) );
                 count_finder += 1;
             },
-            Ok ( PipelineInfo::End            ) => {
+            Ok ( PipelineInfo::End( x ) ) => {
                 for tx in &matcher_in_tx {
-                    tx.send( PipelineInfo::End );
+                    let _ = tx.send( PipelineInfo::End( x ) );
                 }
             },
+            Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_finder_bsy = t0; time_finder_all = t1; },
             Ok ( i                            ) => { let _ = matcher_in_tx[0].send( i ); },
             Err( _                            ) => (),
         }
+
         for i in 0..matcher_num {
             match matcher_out_rx[i].try_recv() {
                 Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_matcher_bsy[i] = t0; time_matcher_all[i] = t1; },
-                Ok ( PipelineInfo::Ok  ( x      ) ) => { count_matcher += 1; let _ = printer_in_tx.send( PipelineInfo::Ok( x ) ); },
-                Ok ( i                            ) => { let _ = printer_in_tx.send( i ); },
+                Ok ( PipelineInfo::Ok  ( x      ) ) => { count_matcher += 1; let _ = queue_in_tx.send( PipelineInfo::Ok( x ) ); },
+                Ok ( i                            ) => { let _ = queue_in_tx.send( i ); },
                 Err( _                            ) => (),
             }
         }
+
+        match queue_out_rx.try_recv() {
+            Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_queue_bsy = t0; time_queue_all = t1; },
+            Ok ( i                            ) => { let _ = printer_in_tx.send( i ); },
+            Err( _                            ) => (),
+        }
+
         match printer_out_rx.try_recv() {
             Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_printer_bsy = t0; time_printer_all = t1; },
             Ok ( PipelineInfo::Info( i      ) ) => console.write( ConsoleTextKind::Info , &format!( "{}\n", i ) ),
             Ok ( PipelineInfo::Err ( e      ) ) => console.write( ConsoleTextKind::Error, &format!( "{}\n", e ) ),
-            Ok ( PipelineInfo::End            ) => break,
+            Ok ( PipelineInfo::End ( _      ) ) => break,
             Ok ( _                            ) => (),
             Err( _                            ) => (),
         }
@@ -262,6 +281,8 @@ fn main() {
 
     let sec_finder_bsy  = time_finder_bsy   as f64 / 1000000000.0;
     let sec_finder_all  = time_finder_all   as f64 / 1000000000.0;
+    let sec_queue_bsy   = time_queue_bsy    as f64 / 1000000000.0;
+    let sec_queue_all   = time_queue_all    as f64 / 1000000000.0;
     let sec_printer_bsy = time_printer_bsy  as f64 / 1000000000.0;
     let sec_printer_all = time_printer_all  as f64 / 1000000000.0;
 
@@ -280,6 +301,7 @@ fn main() {
         for i in 0..matcher_num {
         console.write( ConsoleTextKind::Info, &format!( "    Match{}  : {}s / {}s\n"  , i, sec_matcher_bsy[i], sec_matcher_all[i] ) );
         }
+        console.write( ConsoleTextKind::Info, &format!( "    Queue    : {}s / {}s\n\n", sec_queue_bsy   , sec_queue_all    ) );
         console.write( ConsoleTextKind::Info, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
         console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );

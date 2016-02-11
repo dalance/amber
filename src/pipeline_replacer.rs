@@ -55,6 +55,7 @@ impl SimplePipelineReplacer {
     }
 
     fn replace_match( &mut self, replacement: &[u8], pm: PathMatch ) {
+        if pm.matches.is_empty() { return; }
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error> ( || {
@@ -150,22 +151,25 @@ impl PipelineReplacer for SimplePipelineReplacer {
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
-                Ok( PipelineInfo::Begin ) => {
+
+                Ok( PipelineInfo::Beg( x ) ) => {
                     self.infos  = Vec::new();
                     self.errors = Vec::new();
 
                     self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Begin );
+                    let _ = tx.send( PipelineInfo::Beg( x ) );
                 },
-                Ok( PipelineInfo::End ) => {
+
+                Ok( PipelineInfo::End( x ) ) => {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
                     let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End );
+                    let _ = tx.send( PipelineInfo::End( x ) );
                     break;
                 },
+
                 Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
                 Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
                 Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },

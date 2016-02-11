@@ -53,10 +53,10 @@ pub fn decode_error( e: ErrorKind ) -> &'static str {
 }
 
 pub enum PipelineInfo<T> {
-    Begin           ,
+    Beg ( usize    ),
     Ok  ( T        ),
     Info( String   ),
     Err ( String   ),
     Time( u64, u64 ),
-    End             ,
+    End ( usize    ),
 }

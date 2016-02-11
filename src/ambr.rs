@@ -208,11 +208,11 @@ fn main() {
     // Pipeline Flow
     // ---------------------------------------------------------------------------------------------
 
-    let _ = finder_in_tx.send( PipelineInfo::Begin );
+    let _ = finder_in_tx.send( PipelineInfo::Beg( 0 ) );
     for p in base_paths {
         let _ = finder_in_tx.send( PipelineInfo::Ok( p ) );
     }
-    let _ = finder_in_tx.send( PipelineInfo::End );
+    let _ = finder_in_tx.send( PipelineInfo::End( 1 ) );
 
     let mut time_finder_bsy   = 0;
     let mut time_finder_all   = 0;
@@ -241,7 +241,7 @@ fn main() {
             Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_replacer_bsy = t0; time_replacer_all = t1; },
             Ok ( PipelineInfo::Info( i      ) ) => console.write( ConsoleTextKind::Info , &format!( "{}\n", i ) ),
             Ok ( PipelineInfo::Err ( e      ) ) => console.write( ConsoleTextKind::Error, &format!( "{}\n", e ) ),
-            Ok ( PipelineInfo::End            ) => break,
+            Ok ( PipelineInfo::End ( _      ) ) => break,
             Ok ( _                            ) => (),
             Err( _                            ) => (),
         }

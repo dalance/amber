@@ -31,6 +31,7 @@ pub struct SimplePipelineMatcher {
     pub skip_binary       : bool,
     pub print_skipped     : bool,
     pub binary_check_bytes: usize,
+    pub mmap_bytes        : u64,
     pub infos             : Vec<String>,
     pub errors            : Vec<String>,
     time_beg              : u64,
@@ -44,6 +45,7 @@ impl SimplePipelineMatcher {
             skip_binary       : true,
             print_skipped     : false,
             binary_check_bytes: 128,
+            mmap_bytes        : 1024 * 1024,
             infos             : Vec::new(),
             errors            : Vec::new(),
             time_beg          : 0,
@@ -59,7 +61,7 @@ impl SimplePipelineMatcher {
 
             let mmap;
             let mut buf = Vec::new();
-            let src = if info.len > 1024 * 1024 {
+            let src = if info.len > self.mmap_bytes {
                 mmap = try!( Mmap::open_path( &info.path, Protection::Read ) );
                 unsafe { mmap.as_slice() }
             } else {
@@ -107,32 +109,34 @@ impl PipelineMatcher for SimplePipelineMatcher {
                     let beg = time::precise_time_ns();
 
                     let ret = self.search_path( matcher, keyword, p );
-                    //if !ret.matches.is_empty() { let _ = tx.send( PipelineInfo::Ok( ret ) ); }
                     let _ = tx.send( PipelineInfo::Ok( ret ) );
 
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
-                Ok( PipelineInfo::Begin ) => {
+
+                Ok( PipelineInfo::Beg( x ) ) => {
                     self.infos  = Vec::new();
                     self.errors = Vec::new();
 
                     self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Begin );
+                    let _ = tx.send( PipelineInfo::Beg( x ) );
                 },
-                Ok( PipelineInfo::End ) => {
+
+                Ok( PipelineInfo::End( x ) ) => {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
                     let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End );
+                    let _ = tx.send( PipelineInfo::End( x ) );
                     break;
                 },
-                Ok( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
-                Ok( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
-                Ok( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
-                Err( _ )                           => break,
+
+                Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
+                Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
+                Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
+                Err( _                            ) => break,
             }
         }
     }
@@ -163,11 +167,11 @@ mod tests {
             matcher.search( &qs, &"amber".to_string().into_bytes(), in_rx, out_tx );
         } );
 
-        let _ = in_tx.send( PipelineInfo::Begin );
-        let _ = in_tx.send( PipelineInfo::Ok( PathInfo{ id: 0, path: PathBuf::from( "./src/ambs.rs" ), len: 1 } ) );
-        let _ = in_tx.send( PipelineInfo::Ok( PathInfo{ id: 1, path: PathBuf::from( "./src/ambr.rs" ), len: 1 } ) );
-        let _ = in_tx.send( PipelineInfo::Ok( PathInfo{ id: 2, path: PathBuf::from( "./src/util.rs" ), len: 1 } ) );
-        let _ = in_tx.send( PipelineInfo::End );
+        let _ = in_tx.send( PipelineInfo::Beg( 0                                                                 ) );
+        let _ = in_tx.send( PipelineInfo::Ok ( PathInfo{ id: 0, path: PathBuf::from( "./src/ambs.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::Ok ( PathInfo{ id: 1, path: PathBuf::from( "./src/ambr.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::Ok ( PathInfo{ id: 2, path: PathBuf::from( "./src/util.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::End( 3                                                                 ) );
 
         let mut ret = Vec::new();
         let mut time_bsy = 0;
@@ -176,7 +180,7 @@ mod tests {
             match out_rx.recv().unwrap() {
                 PipelineInfo::Ok  ( x      ) => ret.push( x ),
                 PipelineInfo::Time( t0, t1 ) => { time_bsy = t0; time_all = t1; },
-                PipelineInfo::End            => break,
+                PipelineInfo::End ( _      ) => break,
                 _                            => (),
             }
         }
@@ -184,7 +188,7 @@ mod tests {
         for r in ret {
             if r.path == PathBuf::from( "./src/ambs.rs" ) { assert!( !r.matches.is_empty() ); }
             if r.path == PathBuf::from( "./src/ambr.rs" ) { assert!( !r.matches.is_empty() ); }
-            if r.path == PathBuf::from( "./src/util.rs" ) { assert!( r.matches.is_empty()  ); }
+            if r.path == PathBuf::from( "./src/util.rs" ) { assert!(  r.matches.is_empty() ); }
         }
 
         assert!( time_bsy != 0 );

@@ -1,8 +1,9 @@
 use std::fs;
-use std::path::{Component, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use time;
 use util::PipelineInfo;
+use ignore::{Ignore, IgnoreGit, IgnoreVcs};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineFinder
@@ -27,13 +28,18 @@ pub struct SimplePipelineFinder {
     pub is_recursive  : bool,
     pub follow_symlink: bool,
     pub skip_vcs      : bool,
+    pub skip_gitignore: bool,
+    pub skip_hgignore : bool,
+    pub skip_ambignore: bool,
     pub print_skipped : bool,
     pub infos         : Vec<String>,
     pub errors        : Vec<String>,
     time_beg          : u64,
     time_end          : u64,
     time_bsy          : u64,
-    count             : usize,
+    current_id        : usize,
+    ignore_vcs        : IgnoreVcs,
+    ignore_git        : Vec<IgnoreGit>,
 }
 
 impl SimplePipelineFinder {
@@ -42,13 +48,18 @@ impl SimplePipelineFinder {
             is_recursive  : true,
             follow_symlink: true,
             skip_vcs      : true,
+            skip_gitignore: true,
+            skip_hgignore : true,
+            skip_ambignore: true,
             print_skipped : false,
             infos         : Vec::new(),
             errors        : Vec::new(),
             time_beg      : 0,
             time_end      : 0,
             time_bsy      : 0,
-            count         : 0,
+            current_id    : 0,
+            ignore_vcs    : IgnoreVcs::new(),
+            ignore_git    : Vec::new(),
         }
     }
 
@@ -66,7 +77,19 @@ impl SimplePipelineFinder {
         } else {
             let reader = match fs::read_dir( &base ) {
                 Ok ( x ) => x,
-                Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; /*Vec::new()*/ },
+                Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
+            };
+
+            let mut r = fs::read_dir( &base ).unwrap();
+            let gitignore = r.find( |x| {
+                match x {
+                    &Ok ( ref x ) => x.path().ends_with( ".gitignore" ),
+                    &Err( _     ) => false,
+                } 
+            } );
+            let gitignore_exist = match gitignore {
+                Some( Ok( x ) ) => { self.ignore_git.push( IgnoreGit::new( &x.path() ) ); true },
+                _               => false,
             };
 
             for i in reader {
@@ -87,7 +110,7 @@ impl SimplePipelineFinder {
                         } else {
                             let find_dir     = file_type.is_dir()     & self.is_recursive;
                             let find_symlink = file_type.is_symlink() & self.is_recursive & self.follow_symlink;
-                            if find_dir | find_symlink {
+                            if ( find_dir | find_symlink ) & self.check_dir( &entry.path() ) {
                                 self.find_path( entry.path(), &tx );
                             }
                         }
@@ -95,36 +118,56 @@ impl SimplePipelineFinder {
                     Err( e ) => self.errors.push( format!( "Error: {}", e ) ),
                 };
             }
+
+            if gitignore_exist {
+                let _ = self.ignore_git.pop();
+            }
         }
     }
 
     fn send_path( &mut self, path: PathBuf, len: u64, tx: &Sender<PipelineInfo<PathInfo>> ) {
-        if self.filter_path( &path ) {
-            let _ = tx.send( PipelineInfo::Ok( PathInfo{ id: self.count, path: path, len: len } ) );
+        if self.check_file( &path ) {
+            let _ = tx.send( PipelineInfo::Ok( PathInfo{ id: self.current_id, path: path, len: len } ) );
+            self.current_id += 1;
         }
-        self.count += 1;
     }
 
-    fn filter_path( &mut self, path: &PathBuf ) -> bool {
-        if self.skip_vcs {
-            let dir = path.parent().unwrap();
-            let is_vcs_dir = dir.components().any( |x| {
-                match x {
-                    Component::Normal( p ) if p == ".hg"  => true,
-                    Component::Normal( p ) if p == ".git" => true,
-                    Component::Normal( p ) if p == ".svn" => true,
-                    Component::Normal( p ) if p == ".bzr" => true,
-                    _                                     => false,
-                }
-            } );
-            if is_vcs_dir {
-                if self.print_skipped {
-                    self.infos.push( format!( "Skipped: {:?} ( vcs file )\n", path ) );
-                }
-                return false
-            }
+    fn check_dir( &mut self, path: &PathBuf ) -> bool {
+        let ok_vcs = if self.skip_vcs { self.ignore_vcs.check_dir( &path ) } else { true };
+        let ok_git = if self.skip_gitignore && !self.ignore_git.is_empty() {
+            self.ignore_git.last().unwrap().check_dir( &path )
+        } else {
+            true
+        };
+
+        if !ok_vcs & self.print_skipped {
+            self.infos.push( format!( "Skipped: {:?} ( vcs file )\n", path ) );
         }
-        true
+
+        if !ok_git & self.print_skipped {
+            self.infos.push( format!( "Skipped: {:?} ( .gitignore )\n", path ) );
+        }
+
+        ok_vcs && ok_git
+    }
+
+    fn check_file( &mut self, path: &PathBuf ) -> bool {
+        let ok_vcs = if self.skip_vcs { self.ignore_vcs.check_file( &path ) } else { true };
+        let ok_git = if self.skip_gitignore && !self.ignore_git.is_empty() {
+            self.ignore_git.last().unwrap().check_file( &path )
+        } else {
+            true
+        };
+
+        if !ok_vcs & self.print_skipped {
+            self.infos.push( format!( "Skipped: {:?} ( vcs file )\n", path ) );
+        }
+
+        if !ok_git & self.print_skipped {
+            self.infos.push( format!( "Skipped: {:?} ( .gitignore )\n", path ) );
+        }
+
+        ok_vcs && ok_git
     }
 }
 
@@ -140,27 +183,32 @@ impl PipelineFinder for SimplePipelineFinder {
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
-                Ok( PipelineInfo::Begin ) => {
+
+                Ok( PipelineInfo::Beg( x ) ) => {
+                    self.current_id = x;
+
                     self.infos  = Vec::new();
                     self.errors = Vec::new();
 
                     self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Begin );
+                    let _ = tx.send( PipelineInfo::Beg( x ) );
                 },
-                Ok( PipelineInfo::End ) => {
+
+                Ok( PipelineInfo::End( _ ) ) => {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
                     let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End );
+                    let _ = tx.send( PipelineInfo::End( self.current_id ) );
 
                     break;
                 },
-                Ok( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
-                Ok( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
-                Ok( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
-                Err( _ )                           => break,
+
+                Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
+                Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
+                Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
+                Err( _                            ) => break,
             }
         }
     }
@@ -178,30 +226,32 @@ mod tests {
     use std::sync::mpsc;
     use util::PipelineInfo;
 
-    #[test]
-    fn test_simple_pipeline_finder() {
-        let mut finder = SimplePipelineFinder::new();
-
+    fn test<T: 'static+PipelineFinder+Send>( mut finder: T, path: String ) -> Vec<PathInfo> {
         let ( in_tx , in_rx  ) = mpsc::channel();
         let ( out_tx, out_rx ) = mpsc::channel();
         thread::spawn( move || {
             finder.find( in_rx, out_tx );
         } );
-        let _ = in_tx.send( PipelineInfo::Begin );
-        let _ = in_tx.send( PipelineInfo::Ok( PathBuf::from( "./" ) ) );
-        let _ = in_tx.send( PipelineInfo::End );
+        let _ = in_tx.send( PipelineInfo::Beg( 0                     ) );
+        let _ = in_tx.send( PipelineInfo::Ok ( PathBuf::from( path ) ) );
+        let _ = in_tx.send( PipelineInfo::End( 0                     ) );
 
         let mut ret = Vec::new();
-        let mut time_bsy = 0;
-        let mut time_all = 0;
         loop {
             match out_rx.recv().unwrap() {
                 PipelineInfo::Ok  ( x      ) => ret.push( x ),
-                PipelineInfo::Time( t0, t1 ) => { time_bsy = t0; time_all = t1; },
-                PipelineInfo::End            => break,
+                PipelineInfo::End ( _      ) => break,
                 _                            => (),
             }
         }
+
+        ret
+    }
+
+    #[test]
+    fn simple_pipeline_finder_default() {
+        let finder = SimplePipelineFinder::new();
+        let ret = test( finder, "./".to_string() );
 
         assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./Cargo.toml"     ) ) );
         assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/ambr.rs"    ) ) );
@@ -211,37 +261,13 @@ mod tests {
         assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/matcher.rs" ) ) );
         assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./src/util.rs"    ) ) );
         assert!( !ret.iter().any( |x| x.path == PathBuf::from( "./.git/config"    ) ) );
-
-        assert!( time_bsy != 0 );
-        assert!( time_all != 0 );
-        assert!( time_bsy < time_all );
     }
 
     #[test]
-    fn test_simple_pipeline_finder_not_skip_vcs() {
+    fn simple_pipeline_finder_not_skip_vcs() {
         let mut finder = SimplePipelineFinder::new();
         finder.skip_vcs = false;
-
-        let ( in_tx , in_rx  ) = mpsc::channel();
-        let ( out_tx, out_rx ) = mpsc::channel();
-        thread::spawn( move || {
-            finder.find( in_rx, out_tx );
-        } );
-        let _ = in_tx.send( PipelineInfo::Begin );
-        let _ = in_tx.send( PipelineInfo::Ok( PathBuf::from( "./" ) ) );
-        let _ = in_tx.send( PipelineInfo::End );
-
-        let mut ret = Vec::new();
-        let mut time_bsy = 0;
-        let mut time_all = 0;
-        loop {
-            match out_rx.recv().unwrap() {
-                PipelineInfo::Ok  ( x      ) => ret.push( x ),
-                PipelineInfo::Time( t0, t1 ) => { time_bsy = t0; time_all = t1; },
-                PipelineInfo::End            => break,
-                _                            => (),
-            }
-        }
+        let ret = test( finder, "./".to_string() );
 
         assert!( ret.iter().any( |x| x.path == PathBuf::from( "./Cargo.toml"     ) ) );
         assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/ambr.rs"    ) ) );
@@ -251,10 +277,6 @@ mod tests {
         assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/matcher.rs" ) ) );
         assert!( ret.iter().any( |x| x.path == PathBuf::from( "./src/util.rs"    ) ) );
         assert!( ret.iter().any( |x| x.path == PathBuf::from( "./.git/config"    ) ) );
-
-        assert!( time_bsy != 0 );
-        assert!( time_all != 0 );
-        assert!( time_bsy < time_all );
     }
 }
 

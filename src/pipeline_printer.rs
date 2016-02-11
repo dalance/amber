@@ -22,7 +22,6 @@ pub struct SimplePipelinePrinter {
     pub is_color    : bool,
     pub print_file  : bool,
     pub print_column: bool,
-    pub wait_count  : usize,
     pub infos       : Vec<String>,
     pub errors      : Vec<String>,
     console         : Console,
@@ -37,7 +36,6 @@ impl SimplePipelinePrinter {
             is_color    : true,
             print_file  : true,
             print_column: false,
-            wait_count  : 1,
             infos       : Vec::new(),
             errors      : Vec::new(),
             console     : Console::new(),
@@ -88,7 +86,6 @@ impl SimplePipelinePrinter {
 
 impl PipelinePrinter for SimplePipelinePrinter {
     fn print( &mut self, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
-        let mut count_end = 0;
         loop {
             match rx.recv() {
                 Ok( PipelineInfo::Ok( pm ) ) => {
@@ -100,25 +97,25 @@ impl PipelinePrinter for SimplePipelinePrinter {
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
-                Ok( PipelineInfo::Begin ) => {
+
+                Ok( PipelineInfo::Beg( x ) ) => {
                     self.infos  = Vec::new();
                     self.errors = Vec::new();
 
                     self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Begin );
+                    let _ = tx.send( PipelineInfo::Beg( x ) );
                 },
-                Ok( PipelineInfo::End ) => {
-                    count_end += 1;
-                    if count_end < self.wait_count { continue; }
 
+                Ok( PipelineInfo::End( x ) ) => {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
                     let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End );
+                    let _ = tx.send( PipelineInfo::End( x ) );
                     break;
                 },
+
                 Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
                 Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
                 Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
