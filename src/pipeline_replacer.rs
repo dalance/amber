@@ -1,7 +1,6 @@
 use console::{Console, ConsoleTextKind};
 use memmap::{Mmap, Protection};
 use pipeline_matcher::PathMatch;
-use std::env;
 use std::fs;
 use std::io;
 use std::io::{Write, Error};
@@ -59,8 +58,7 @@ impl SimplePipelineReplacer {
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error> ( || {
-            let tmpfile_dir = env::temp_dir();
-            let mut tmpfile = try!( NamedTempFile::new_in( tmpfile_dir ) );
+            let mut tmpfile = try!( NamedTempFile::new_in( pm.path.parent().unwrap_or( &pm.path ) )  );
 
             {
                 let mmap = try!( Mmap::open_path( &pm.path, Protection::Read ) );
