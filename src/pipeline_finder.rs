@@ -65,6 +65,8 @@ impl SimplePipelineFinder {
 
     fn find_path( &mut self, base: PathBuf, tx: &Sender<PipelineInfo<PathInfo>> ) {
 
+        // TODO: .gitignore search to parent directories
+
         let attr = match fs::metadata( &base ) {
             Ok ( x ) => x,
             Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
@@ -80,17 +82,7 @@ impl SimplePipelineFinder {
                 Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
             };
 
-            let mut r = fs::read_dir( &base ).unwrap();
-            let gitignore = r.find( |x| {
-                match x {
-                    &Ok ( ref x ) => x.path().ends_with( ".gitignore" ),
-                    &Err( _     ) => false,
-                } 
-            } );
-            let gitignore_exist = match gitignore {
-                Some( Ok( x ) ) => { self.ignore_git.push( IgnoreGit::new( &x.path() ) ); true },
-                _               => false,
-            };
+            let gitignore_exist = self.push_gitignore( &base );
 
             for i in reader {
                 match i {
@@ -119,9 +111,7 @@ impl SimplePipelineFinder {
                 };
             }
 
-            if gitignore_exist {
-                let _ = self.ignore_git.pop();
-            }
+            self.pop_gitignore( gitignore_exist )
         }
     }
 
@@ -129,6 +119,26 @@ impl SimplePipelineFinder {
         if self.check_file( &path ) {
             let _ = tx.send( PipelineInfo::Ok( PathInfo{ id: self.current_id, path: path, len: len } ) );
             self.current_id += 1;
+        }
+    }
+
+    fn push_gitignore( &mut self, path: &PathBuf ) -> bool {
+        let mut reader = fs::read_dir( &path ).unwrap();
+        let gitignore = reader.find( |x| {
+            match x {
+                &Ok ( ref x ) => x.path().ends_with( ".gitignore" ),
+                &Err( _     ) => false,
+            } 
+        } );
+        match gitignore {
+            Some( Ok( x ) ) => { self.ignore_git.push( IgnoreGit::new( &x.path() ) ); true },
+            _               => false,
+        }
+    }
+
+    fn pop_gitignore( &mut self, exist: bool ) {
+        if exist {
+            let _ = self.ignore_git.pop();
         }
     }
 

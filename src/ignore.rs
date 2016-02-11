@@ -94,7 +94,6 @@ impl IgnoreGit {
 
         let path_abs = path.canonicalize().unwrap();
         let base     = path_abs.parent().unwrap().to_string_lossy();
-        println!( "{:?}", path_abs );
 
         for line in f.lines() {
             let s = line.unwrap();
