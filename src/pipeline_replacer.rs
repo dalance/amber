@@ -125,7 +125,7 @@ impl SimplePipelineReplacer {
             let metadata = try!( fs::metadata( &pm.path ) );
 
             try!( fs::set_permissions( tmpfile.path(), metadata.permissions() ) );
-            try!( fs::rename( tmpfile.path(), &pm.path ) );
+            try!( tmpfile.persist( &pm.path ) );
 
             Ok(())
         } );
