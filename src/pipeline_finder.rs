@@ -65,8 +65,6 @@ impl SimplePipelineFinder {
 
     fn find_path( &mut self, base: PathBuf, tx: &Sender<PipelineInfo<PathInfo>> ) {
 
-        // TODO: .gitignore search to parent directories
-
         let attr = match fs::metadata( &base ) {
             Ok ( x ) => x,
             Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
@@ -123,6 +121,8 @@ impl SimplePipelineFinder {
     }
 
     fn push_gitignore( &mut self, path: &PathBuf ) -> bool {
+        if !self.skip_gitignore { return false }
+
         let mut reader = fs::read_dir( &path ).unwrap();
         let gitignore = reader.find( |x| {
             match x {
@@ -179,6 +179,27 @@ impl SimplePipelineFinder {
 
         ok_vcs && ok_git
     }
+
+    fn set_default_gitignore( &mut self, base: &PathBuf ) {
+        // TODO 
+
+        //if !self.skip_gitignore { return }
+
+        //let base_abs = match base.canonicalize() {
+        //    Ok ( x ) => x,
+        //    Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
+        //};
+
+        //let mut parent = base_abs.parent();
+        //println!( "{:?}", parent );
+        //while parent.is_some() {
+        //    if self.push_gitignore( &PathBuf::from( parent.unwrap() ) ) {
+        //        break;
+        //    }
+        //    parent = parent.unwrap().parent();
+        //    println!( "{:?}", parent );
+        //}
+    }
 }
 
 impl PipelineFinder for SimplePipelineFinder {
@@ -188,6 +209,7 @@ impl PipelineFinder for SimplePipelineFinder {
                 Ok( PipelineInfo::Ok( p ) ) => {
                     let beg = time::precise_time_ns();
 
+                    self.set_default_gitignore( &p );
                     self.find_path( p, &tx );
 
                     let end = time::precise_time_ns();

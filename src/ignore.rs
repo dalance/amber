@@ -54,23 +54,29 @@ impl Ignore for IgnoreVcs {
 // IgnoreGit
 // ---------------------------------------------------------------------------------------------------------------------
 
+pub struct IgnoreGitPat {
+    pat : Pattern,
+    head: String ,
+    tail: String ,
+}
+
 pub struct IgnoreGit {
-    pat_name    : Vec<Pattern>,
-    pat_name_abs: Vec<Pattern>,
-    pat_dir     : Vec<Pattern>,
-    pat_dir_abs : Vec<Pattern>,
-    opt         : MatchOptions,
+    file_name: Vec<IgnoreGitPat>,
+    file_path: Vec<IgnoreGitPat>,
+    dir_name : Vec<IgnoreGitPat>,
+    dir_path : Vec<IgnoreGitPat>,
+    opt      : MatchOptions,
 }
 
 impl IgnoreGit {
     pub fn new( path: &PathBuf ) -> Self {
-        let ( name, name_abs, dir, dir_abs ) = IgnoreGit::parse( &path );
+        let ( f_name, f_path, d_name, d_path ) = IgnoreGit::parse( &path );
         IgnoreGit {
-            pat_name    : name    ,
-            pat_name_abs: name_abs,
-            pat_dir     : dir     ,
-            pat_dir_abs : dir_abs ,
-            opt         : MatchOptions {
+            file_name: f_name,
+            file_path: f_path,
+            dir_name : d_name,
+            dir_path : d_path,
+            opt      : MatchOptions {
                 case_sensitive             : true,
                 require_literal_separator  : true,
                 require_literal_leading_dot: true,
@@ -78,22 +84,20 @@ impl IgnoreGit {
         }
     }
 
-    fn parse( path: &PathBuf ) -> ( Vec<Pattern>, Vec<Pattern>, Vec<Pattern>, Vec<Pattern> ) {
-        let mut name     = Vec::new();
-        let mut name_abs = Vec::new();
-        let mut dir      = Vec::new();
-        let mut dir_abs  = Vec::new();
+    fn parse( path: &PathBuf ) -> ( Vec<IgnoreGitPat>, Vec<IgnoreGitPat>, Vec<IgnoreGitPat>, Vec<IgnoreGitPat> ) {
+        let mut file_name = Vec::new();
+        let mut file_path = Vec::new();
+        let mut dir_name  = Vec::new();
+        let mut dir_path  = Vec::new();
 
         let f = if let Ok( x ) = File::open( &path ) {
             x
-        } else { 
-            return ( name, name_abs, dir, dir_abs )
+        } else {
+            return ( file_name, file_path, dir_name, dir_path )
         };
-
         let f = BufReader::new( f );
 
-        let path_abs = path.canonicalize().unwrap();
-        let base     = path_abs.parent().unwrap().to_string_lossy();
+        let base = path.parent().unwrap().to_string_lossy();
 
         for line in f.lines() {
             let s = line.unwrap();
@@ -105,27 +109,33 @@ impl IgnoreGit {
                 // not yet implemented
             } else if !s.contains( "/" ) {
                 if let Ok( x ) = Pattern::new( &s ) {
-                    name.push( x )
+                    let ( head, tail ) = IgnoreGit::extract_fix_pat( &s );
+                    file_name.push( IgnoreGitPat{ pat: x.clone(), head: head.clone(), tail: tail.clone() } );
+                    dir_name .push( IgnoreGitPat{ pat: x        , head: head.clone(), tail: tail.clone() } )
                 }
             } else if s.ends_with( "/" ) && s.find( "/" ).unwrap() < s.len() - 1 {
                 let p = IgnoreGit::concat_path( &base, &s );
                 if let Ok( x ) = Pattern::new( &p ) {
-                    dir_abs.push( x )
+                    let ( head, tail ) = IgnoreGit::extract_fix_pat( &p );
+                    dir_path.push( IgnoreGitPat{ pat: x, head: head.clone(), tail: tail.clone() } )
                 }
             } else if s.ends_with( "/" ) {
                 let p = IgnoreGit::normalize( &s );
                 if let Ok( x ) = Pattern::new( &p ) {
-                    dir.push( x )
+                    let ( head, tail ) = IgnoreGit::extract_fix_pat( &p );
+                    dir_name.push( IgnoreGitPat{ pat: x, head: head.clone(), tail: tail.clone() } )
                 }
             } else {
                 let p = IgnoreGit::concat_path( &base, &s );
                 if let Ok( x ) = Pattern::new( &p ) {
-                    name_abs.push( x )
+                    let ( head, tail ) = IgnoreGit::extract_fix_pat( &p );
+                    file_path.push( IgnoreGitPat{ pat: x.clone(), head: head.clone(), tail: tail.clone() } );
+                    dir_path .push( IgnoreGitPat{ pat: x        , head: head.clone(), tail: tail.clone() } )
                 }
             }
         }
 
-        ( name, name_abs, dir, dir_abs )
+        ( file_name, file_path, dir_name, dir_path )
     }
 
     fn concat_path( s0: &str, s1: &str ) -> String {
@@ -146,43 +156,64 @@ impl IgnoreGit {
             String::from( s )
         }
     }
+
+    fn extract_fix_pat( p: &str ) -> ( String, String ) {
+        let len = p.len();
+
+        let head_p0 = p.find( "\\" ).unwrap_or( len );
+        let head_p1 = p.find( "*"  ).unwrap_or( len );
+        let head_p2 = p.find( "?"  ).unwrap_or( len );
+        let head_p3 = p.find( "["  ).unwrap_or( len );
+        let head_ps = [head_p0, head_p1, head_p2, head_p3];
+        let head_p  = head_ps.iter().min().unwrap_or( &len );
+
+        let tail_p0 = p.rfind( "*" ).map( |x| x + 1 ).unwrap_or( 0 );
+        let tail_p1 = p.rfind( "?" ).map( |x| x + 1 ).unwrap_or( 0 );
+        let tail_p2 = p.rfind( "]" ).map( |x| x + 1 ).unwrap_or( 0 );
+        let tail_ps = [tail_p0, tail_p1, tail_p2];
+        let tail_p  = tail_ps.iter().max().unwrap_or( &len );
+
+        let head = if head_p == &0 {
+            String::from( "" )
+        } else {
+            String::from( &p[0..*head_p] )
+        };
+
+        let tail = if tail_p == &len {
+            String::from( "" )
+        } else {
+            String::from( &p[*tail_p..len] )
+        };
+
+        ( head, tail )
+    }
 }
 
 impl Ignore for IgnoreGit {
 
     fn check_dir ( &self, path: &PathBuf ) -> bool {
-        let abs  = if let Ok( x ) = path.canonicalize() {
-            x
-        } else {
-            return true
-        };
 
-        let name = if let Some( x ) = path.file_name() {
+        let path_str = path.to_string_lossy();
+        let name_str = if let Some( x ) = path.file_name() {
             x.to_string_lossy()
         } else {
             return true
         };
 
-        for p in &self.pat_dir {
-            if p.matches_with( &name, &self.opt ) {
+        for p in &self.dir_name {
+            if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
+                continue;
+            }
+            if p.pat.matches_with( &name_str, &self.opt ) {
                 return false
             }
         }
 
-        for p in &self.pat_dir_abs {
-            if p.matches_path_with( &abs, &self.opt ) {
-                return false
+        for p in &self.dir_path {
+            if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
+                continue;
             }
-        }
-
-        for p in &self.pat_name {
-            if p.matches_with( &name, &self.opt ) {
-                return false
-            }
-        }
-
-        for p in &self.pat_name_abs {
-            if p.matches_path_with( &abs, &self.opt ) {
+            if p.pat.matches_with( &path_str, &self.opt ) {
                 return false
             }
         }
@@ -191,26 +222,28 @@ impl Ignore for IgnoreGit {
     }
 
     fn check_file( &self, path: &PathBuf ) -> bool {
-        let abs  = if let Ok( x ) = path.canonicalize() {
-            x
-        } else {
-            return true
-        };
 
-        let name = if let Some( x ) = path.file_name() {
+        let path_str = path.to_string_lossy();
+        let name_str = if let Some( x ) = path.file_name() {
             x.to_string_lossy()
         } else {
             return true
         };
 
-        for p in &self.pat_name {
-            if p.matches_with( &name, &self.opt ) {
+        for p in &self.file_name {
+            if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
+                continue;
+            }
+            if p.pat.matches_with( &name_str, &self.opt ) {
                 return false
             }
         }
 
-        for p in &self.pat_name_abs {
-            if p.matches_path_with( &abs, &self.opt ) {
+        for p in &self.file_path {
+            if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
+                continue;
+            }
+            if p.pat.matches_with( &path_str, &self.opt ) {
                 return false
             }
         }
