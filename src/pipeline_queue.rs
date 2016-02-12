@@ -74,7 +74,7 @@ impl PipelineQueue for SimplePipelineQueue {
                 },
 
                 Ok( PipelineInfo::End( x ) ) => {
-                    if !self.map.is_empty() { continue; }
+                    if x != self.current_id { continue; }
 
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
