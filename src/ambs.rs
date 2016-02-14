@@ -51,6 +51,7 @@ Options:
     -v --version               Show version
 
 Experimental Options:
+    --mmap-bytes <bytes>       Minimum size by byte for using mmap [default: 1048576]
     --tbm                      Enable TBM matcher
     --sse                      Enable SSE 4.2
 ";
@@ -66,6 +67,7 @@ struct Args {
     flag_max_threads      : usize,
     flag_size_per_thread  : usize,
     flag_bin_check_bytes  : usize,
+    flag_mmap_bytes       : u64,
     flag_regex            : bool,
     flag_column           : bool,
     flag_binary           : bool,
@@ -138,28 +140,28 @@ fn main() {
 
     let matcher_num = args.flag_max_threads;
 
-    let ( finder_in_tx  , finder_in_rx   ) = mpsc::channel();
-    let ( finder_out_tx , finder_out_rx  ) = mpsc::channel();
-    let ( queue_in_tx   , queue_in_rx    ) = mpsc::channel();
-    let ( queue_out_tx  , queue_out_rx   ) = mpsc::channel();
-    let ( printer_in_tx , printer_in_rx  ) = mpsc::channel();
-    let ( printer_out_tx, printer_out_rx ) = mpsc::channel();
+    let ( finder_in_tx   , finder_in_rx    ) = mpsc::channel();
+    let ( finder_out_tx  , finder_out_rx   ) = mpsc::channel();
+    let ( queue_in_tx    , queue_in_rx     ) = mpsc::channel();
+    let ( queue_out_tx   , queue_out_rx    ) = mpsc::channel();
+    let ( printer_in_tx  , printer_in_rx   ) = mpsc::channel();
+    let ( printer_out_tx , printer_out_rx  ) = mpsc::channel();
 
     let mut matcher_in_tx  = Vec::new();
     let mut matcher_out_rx = Vec::new();
 
-    let mut finder  = SimplePipelineFinder::new();
-    let mut queue   = SimplePipelineQueue::new();
-    let mut printer = SimplePipelinePrinter::new();
+    let mut finder   = SimplePipelineFinder::new();
+    let mut queue    = SimplePipelineQueue::new();
+    let mut printer  = SimplePipelinePrinter::new();
 
-    finder.is_recursive   = !args.flag_no_recursive;
-    finder.follow_symlink = !args.flag_no_symlink;
-    finder.skip_vcs       = !args.flag_no_skip_vcs;
-    finder.skip_gitignore = !args.flag_no_skip_gitignore;
-    finder.print_skipped  = args.flag_skipped;
-    printer.is_color      = !args.flag_no_color;
-    printer.print_file    = !args.flag_no_file;
-    printer.print_column  = args.flag_column;
+    finder.is_recursive     = !args.flag_no_recursive;
+    finder.follow_symlink   = !args.flag_no_symlink;
+    finder.skip_vcs         = !args.flag_no_skip_vcs;
+    finder.skip_gitignore   = !args.flag_no_skip_gitignore;
+    finder.print_skipped    = args.flag_skipped;
+    printer.is_color        = !args.flag_no_color;
+    printer.print_file      = !args.flag_no_file;
+    printer.print_column    = args.flag_column;
 
     let _ = thread::Builder::new().name( "finder".to_string() ).spawn( move || {
         finder.find( finder_in_rx, finder_out_tx );
@@ -176,6 +178,7 @@ fn main() {
         matcher.skip_binary        = !args.flag_binary;
         matcher.print_skipped      = args.flag_skipped;
         matcher.binary_check_bytes = args.flag_bin_check_bytes;
+        matcher.mmap_bytes         = args.flag_mmap_bytes;
 
         let max_threads     = args.flag_max_threads;
         let size_per_thread = args.flag_size_per_thread;
@@ -217,12 +220,12 @@ fn main() {
     }
     let _ = finder_in_tx.send( PipelineInfo::End( 1 ) );
 
-    let mut time_finder_bsy  = 0;
-    let mut time_finder_all  = 0;
-    let mut time_queue_bsy   = 0;
-    let mut time_queue_all   = 0;
-    let mut time_printer_bsy = 0;
-    let mut time_printer_all = 0;
+    let mut time_finder_bsy   = 0;
+    let mut time_finder_all   = 0;
+    let mut time_queue_bsy    = 0;
+    let mut time_queue_all    = 0;
+    let mut time_printer_bsy  = 0;
+    let mut time_printer_all  = 0;
 
     let mut time_matcher_bsy = Vec::new();
     let mut time_matcher_all = Vec::new();
@@ -253,7 +256,12 @@ fn main() {
         for i in 0..matcher_num {
             match matcher_out_rx[i].try_recv() {
                 Ok ( PipelineInfo::Time( t0, t1 ) ) => { time_matcher_bsy[i] = t0; time_matcher_all[i] = t1; },
-                Ok ( PipelineInfo::Ok  ( x      ) ) => { count_matcher += 1; let _ = queue_in_tx.send( PipelineInfo::Ok( x ) ); },
+                Ok ( PipelineInfo::Ok  ( x      ) ) => {
+                    if !x.matches.is_empty() {
+                        count_matcher += 1;
+                    }
+                    let _ = queue_in_tx.send( PipelineInfo::Ok( x ) );
+                },
                 Ok ( i                            ) => { let _ = queue_in_tx.send( i ); },
                 Err( _                            ) => (),
             }
@@ -279,12 +287,12 @@ fn main() {
     // Pipeline Flow
     // ---------------------------------------------------------------------------------------------
 
-    let sec_finder_bsy  = time_finder_bsy   as f64 / 1000000000.0;
-    let sec_finder_all  = time_finder_all   as f64 / 1000000000.0;
-    let sec_queue_bsy   = time_queue_bsy    as f64 / 1000000000.0;
-    let sec_queue_all   = time_queue_all    as f64 / 1000000000.0;
-    let sec_printer_bsy = time_printer_bsy  as f64 / 1000000000.0;
-    let sec_printer_all = time_printer_all  as f64 / 1000000000.0;
+    let sec_finder_bsy   = time_finder_bsy   as f64 / 1000000000.0;
+    let sec_finder_all   = time_finder_all   as f64 / 1000000000.0;
+    let sec_queue_bsy    = time_queue_bsy    as f64 / 1000000000.0;
+    let sec_queue_all    = time_queue_all    as f64 / 1000000000.0;
+    let sec_printer_bsy  = time_printer_bsy  as f64 / 1000000000.0;
+    let sec_printer_all  = time_printer_all  as f64 / 1000000000.0;
 
     let mut sec_matcher_bsy = Vec::new();
     let mut sec_matcher_all = Vec::new();
@@ -299,7 +307,7 @@ fn main() {
         console.write( ConsoleTextKind::Info, &format!( "  Consumed time ( busy / total )\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Find     : {}s / {}s\n"  , sec_finder_bsy  , sec_finder_all   ) );
         for i in 0..matcher_num {
-        console.write( ConsoleTextKind::Info, &format!( "    Match{}  : {}s / {}s\n"  , i, sec_matcher_bsy[i], sec_matcher_all[i] ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Match{:02}  : {}s / {}s\n"  , i, sec_matcher_bsy[i], sec_matcher_all[i] ) );
         }
         console.write( ConsoleTextKind::Info, &format!( "    Queue    : {}s / {}s\n\n", sec_queue_bsy   , sec_queue_all    ) );
         console.write( ConsoleTextKind::Info, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
