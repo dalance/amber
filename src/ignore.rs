@@ -183,11 +183,8 @@ impl IgnoreGit {
 
         ( head, tail )
     }
-}
 
-impl Ignore for IgnoreGit {
-
-    fn check_dir ( &self, path: &PathBuf ) -> bool {
+    fn check ( &self, path: &PathBuf, names: &Vec<IgnoreGitPat>, paths: &Vec<IgnoreGitPat> ) -> bool {
 
         let path_str = path.to_string_lossy();
         let name_str = if let Some( x ) = path.file_name() {
@@ -201,35 +198,29 @@ impl Ignore for IgnoreGit {
         let name_end = ( name_str.len() - 1 ) as isize;
         let path_end = ( path_str.len() - 1 ) as isize;
 
-        for p in &self.dir_name {
+        for p in names {
             unsafe {
-                if ( p.head == 0 ) || ( *name_ptr != p.head ) {
+                if ( p.head != 0 ) && ( *name_ptr != p.head ) {
                     continue;
                 }
-                if ( p.tail == 0 ) || ( *name_ptr.offset( name_end ) != p.tail ) {
+                if ( p.tail != 0 ) && ( *name_ptr.offset( name_end ) != p.tail ) {
                     continue;
                 }
             }
-            //if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
-            //    continue;
-            //}
             if p.pat.matches_with( &name_str, &self.opt ) {
                 return false
             }
         }
 
-        for p in &self.dir_path {
+        for p in paths {
             unsafe {
-                if ( p.head == 0 ) || ( *path_ptr != p.head ) {
+                if ( p.head != 0 ) && ( *path_ptr != p.head ) {
                     continue;
                 }
-                if ( p.tail == 0 ) || ( *path_ptr.offset( path_end ) != p.tail ) {
+                if ( p.tail != 0 ) && ( *path_ptr.offset( path_end ) != p.tail ) {
                     continue;
                 }
             }
-            //if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
-            //    continue;
-            //}
             if p.pat.matches_with( &path_str, &self.opt ) {
                 return false
             }
@@ -237,56 +228,16 @@ impl Ignore for IgnoreGit {
 
         true
     }
+}
+
+impl Ignore for IgnoreGit {
+
+    fn check_dir ( &self, path: &PathBuf ) -> bool {
+        self.check( path, &self.dir_name, &self.dir_path )
+    }
 
     fn check_file( &self, path: &PathBuf ) -> bool {
-
-        let path_str = path.to_string_lossy();
-        let name_str = if let Some( x ) = path.file_name() {
-            x.to_string_lossy()
-        } else {
-            return true
-        };
-
-        let name_ptr = name_str.as_bytes().as_ptr();
-        let path_ptr = path_str.as_bytes().as_ptr();
-        let name_end = ( name_str.len() - 1 ) as isize;
-        let path_end = ( path_str.len() - 1 ) as isize;
-
-        for p in &self.file_name {
-            unsafe {
-                if ( p.head == 0 ) || ( *name_ptr != p.head ) {
-                    continue;
-                }
-                if ( p.tail == 0 ) || ( *name_ptr.offset( name_end ) != p.tail ) {
-                    continue;
-                }
-            }
-            //if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
-            //    continue;
-            //}
-            if p.pat.matches_with( &name_str, &self.opt ) {
-                return false
-            }
-        }
-
-        for p in &self.file_path {
-            unsafe {
-                if ( p.head == 0 ) || ( *path_ptr != p.head ) {
-                    continue;
-                }
-                if ( p.tail == 0 ) || ( *path_ptr.offset( path_end ) != p.tail ) {
-                    continue;
-                }
-            }
-            //if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
-            //    continue;
-            //}
-            if p.pat.matches_with( &path_str, &self.opt ) {
-                return false
-            }
-        }
-
-        true
+        self.check( path, &self.file_name, &self.file_path )
     }
 }
 
