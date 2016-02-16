@@ -34,7 +34,7 @@ Options:
     --key-file <file>          Use file contents as keyword
     --max-threads <num>        Number of max threads [default: num_cpus]
     --size-per-thread <bytes>  File size per one thread [default: 1048576]
-    --bin-check-bytes <bytes>  Read size by byte for checking binary [default: 1024]
+    --bin-check-bytes <bytes>  Read size by byte for checking binary [default: 256]
     --regex                    Enable regular expression search
     --column                   Enable column output
     --binary                   Enable binary file search
@@ -315,4 +315,6 @@ fn main() {
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
         console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );
     }
+
+    console.reset();
 }

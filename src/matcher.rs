@@ -135,6 +135,10 @@ impl QuickSearchMatcher {
         let pat_len = pat.len();
         let mut ret = Vec::new();
 
+        let src_ptr = src.as_ptr();
+        let pat_ptr = pat.as_ptr();
+        let qs_ptr  = qs_table.as_ptr();
+
         let pat_len_by_dq = if pat_len % 16 == 0 { pat_len / 16 } else { pat_len / 16 + 1 };
 
         let mut i = beg;
@@ -146,11 +150,15 @@ impl QuickSearchMatcher {
             if self.use_sse {
                 cmp_pat_sse!( src[i], pat[0], pat_len, pat_len_by_dq, { success = false; break; } );
             } else {
-                for j in 0 .. pat_len {
-                    if src[i+j] != pat[j] {
-                        success = false;
-                        break;
+                let mut j = 0;
+                while j < pat_len {
+                    unsafe {
+                        if *src_ptr.offset( ( i + j ) as isize ) != *pat_ptr.offset( j as isize ) {
+                            success = false;
+                            break;
+                        }
                     }
+                    j += 1;
                 }
             }
 
@@ -163,7 +171,10 @@ impl QuickSearchMatcher {
             }
 
             if src_len <= i+pat_len { break; }
-            i += qs_table[src[i+pat_len] as usize];
+            unsafe {
+                let t = *src_ptr.offset( ( i+pat_len ) as isize ) as isize;
+                i += *qs_ptr.offset( t );
+            }
         }
 
         ret
@@ -176,8 +187,10 @@ impl Matcher for QuickSearchMatcher {
         let pat_len = pat.len();
 
         let mut qs_table: [usize;256] = [pat_len+1;256];
-        for i in 0 .. pat_len {
+        let mut i = 0;
+        while i < pat_len {
             qs_table[pat[i] as usize] = pat_len - i;
+            i += 1;
         }
 
         let thread_num = cmp::min( src_len / self.size_per_thread + 1, self.max_threads );

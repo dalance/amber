@@ -3,7 +3,8 @@
 cnt=3
 out="result.txt"
 
-prgs=(grep ack ag pt hw sift ambs)
+#prgs=(grep ack ag pt hw sift ambs)
+prgs=(grep ag pt hw sift ambs)
 
 opt_grep="--binary-files=without-match --color=auto -r"
 opt_ack="--nogroup"
@@ -11,6 +12,7 @@ opt_ag="--nogroup"
 opt_pt="--nogroup"
 opt_hw="--no-group"
 opt_sift=""
+#opt_ambs="--no-skip-gitignore"
 opt_ambs=""
 
 echo "" > $out

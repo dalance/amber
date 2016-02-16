@@ -56,8 +56,8 @@ impl Ignore for IgnoreVcs {
 
 pub struct IgnoreGitPat {
     pat : Pattern,
-    head: String ,
-    tail: String ,
+    head: u8     ,
+    tail: u8     ,
 }
 
 pub struct IgnoreGit {
@@ -157,32 +157,28 @@ impl IgnoreGit {
         }
     }
 
-    fn extract_fix_pat( p: &str ) -> ( String, String ) {
+    fn extract_fix_pat( p: &str ) -> ( u8, u8 ) {
         let len = p.len();
 
-        let head_p0 = p.find( "\\" ).unwrap_or( len );
-        let head_p1 = p.find( "*"  ).unwrap_or( len );
-        let head_p2 = p.find( "?"  ).unwrap_or( len );
-        let head_p3 = p.find( "["  ).unwrap_or( len );
-        let head_ps = [head_p0, head_p1, head_p2, head_p3];
-        let head_p  = head_ps.iter().min().unwrap_or( &len );
+        let mut head_check = !p.starts_with( "\\" );
+        head_check        &= !p.starts_with( "*"  );
+        head_check        &= !p.starts_with( "?"  );
+        head_check        &= !p.starts_with( "["  );
 
-        let tail_p0 = p.rfind( "*" ).map( |x| x + 1 ).unwrap_or( 0 );
-        let tail_p1 = p.rfind( "?" ).map( |x| x + 1 ).unwrap_or( 0 );
-        let tail_p2 = p.rfind( "]" ).map( |x| x + 1 ).unwrap_or( 0 );
-        let tail_ps = [tail_p0, tail_p1, tail_p2];
-        let tail_p  = tail_ps.iter().max().unwrap_or( &len );
+        let mut tail_check = !p.ends_with( "*" );
+        tail_check        &= !p.ends_with( "?" );
+        tail_check        &= !p.ends_with( "]" );
 
-        let head = if head_p == &0 {
-            String::from( "" )
+        let head = if head_check {
+            p.as_bytes()[0]
         } else {
-            String::from( &p[0..*head_p] )
+            0
         };
 
-        let tail = if tail_p == &len {
-            String::from( "" )
+        let tail = if tail_check {
+            p.as_bytes()[len-1]
         } else {
-            String::from( &p[*tail_p..len] )
+            0
         };
 
         ( head, tail )
@@ -200,19 +196,40 @@ impl Ignore for IgnoreGit {
             return true
         };
 
+        let name_ptr = name_str.as_bytes().as_ptr();
+        let path_ptr = path_str.as_bytes().as_ptr();
+        let name_end = ( name_str.len() - 1 ) as isize;
+        let path_end = ( path_str.len() - 1 ) as isize;
+
         for p in &self.dir_name {
-            if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
-                continue;
+            unsafe {
+                if ( p.head == 0 ) || ( *name_ptr != p.head ) {
+                    continue;
+                }
+                if ( p.tail == 0 ) || ( *name_ptr.offset( name_end ) != p.tail ) {
+                    continue;
+                }
             }
+            //if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
+            //    continue;
+            //}
             if p.pat.matches_with( &name_str, &self.opt ) {
                 return false
             }
         }
 
         for p in &self.dir_path {
-            if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
-                continue;
+            unsafe {
+                if ( p.head == 0 ) || ( *path_ptr != p.head ) {
+                    continue;
+                }
+                if ( p.tail == 0 ) || ( *path_ptr.offset( path_end ) != p.tail ) {
+                    continue;
+                }
             }
+            //if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
+            //    continue;
+            //}
             if p.pat.matches_with( &path_str, &self.opt ) {
                 return false
             }
@@ -230,19 +247,40 @@ impl Ignore for IgnoreGit {
             return true
         };
 
+        let name_ptr = name_str.as_bytes().as_ptr();
+        let path_ptr = path_str.as_bytes().as_ptr();
+        let name_end = ( name_str.len() - 1 ) as isize;
+        let path_end = ( path_str.len() - 1 ) as isize;
+
         for p in &self.file_name {
-            if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
-                continue;
+            unsafe {
+                if ( p.head == 0 ) || ( *name_ptr != p.head ) {
+                    continue;
+                }
+                if ( p.tail == 0 ) || ( *name_ptr.offset( name_end ) != p.tail ) {
+                    continue;
+                }
             }
+            //if !name_str.starts_with( &p.head ) || !name_str.ends_with( &p.tail ) {
+            //    continue;
+            //}
             if p.pat.matches_with( &name_str, &self.opt ) {
                 return false
             }
         }
 
         for p in &self.file_path {
-            if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
-                continue;
+            unsafe {
+                if ( p.head == 0 ) || ( *path_ptr != p.head ) {
+                    continue;
+                }
+                if ( p.tail == 0 ) || ( *path_ptr.offset( path_end ) != p.tail ) {
+                    continue;
+                }
             }
+            //if !path_str.starts_with( &p.head ) || !path_str.ends_with( &p.tail ) {
+            //    continue;
+            //}
             if p.pat.matches_with( &path_str, &self.opt ) {
                 return false
             }

@@ -59,7 +59,7 @@ impl SimplePipelinePrinter {
             for m in &pm.matches {
                 if self.print_file {
                     self.console.write( ConsoleTextKind::Filename, pm.path.to_str().unwrap() );
-                    self.console.write( ConsoleTextKind::Other, ":" );
+                    self.console.write( ConsoleTextKind::Filename, ":" );
                 }
                 if self.print_column {
                     while pos < m.beg {

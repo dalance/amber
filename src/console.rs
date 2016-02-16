@@ -22,8 +22,10 @@ pub enum ConsoleTextKind {
 
 pub struct Console {
     pub is_color: bool,
-    term_stdout: Box<StdoutTerminal>,
-    term_stderr: Box<StderrTerminal>,
+    term_stdout : Box<StdoutTerminal>,
+    term_stderr : Box<StderrTerminal>,
+    color_out   : Color,
+    color_err   : Color,
 }
 
 impl Console {
@@ -32,6 +34,8 @@ impl Console {
             term_stdout: term::stdout().unwrap_or_else( || { process::exit( 1 ); } ),
             term_stderr: term::stderr().unwrap_or_else( || { process::exit( 1 ); } ),
             is_color   : true,
+            color_out  : term::color::BLACK,
+            color_err  : term::color::BLACK,
         }
     }
 
@@ -75,6 +79,11 @@ impl Console {
         let _ = io::stderr().flush();
     }
 
+    pub fn reset( &mut self ) {
+        self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+    }
+
     pub fn write_match_line( &mut self, src: &[u8], m: &Match ) {
         let mut beg = m.beg;
         let mut end = m.end;
@@ -95,33 +104,39 @@ impl Console {
         if m.end < end {
             self.write( ConsoleTextKind::Text, &String::from_utf8_lossy( &src[m.end..end] ) );
         }
-        self.write( ConsoleTextKind::Other, "\n" );
+        self.write( ConsoleTextKind::Text, "\n" );
     }
 
     fn write_stdout( &mut self, val: &str, color: Color ) {
         if self.is_color {
-            self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+            if self.color_out != color {
+                self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+                self.color_out = color;
+            }
         }
 
         write!( self.term_stdout, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } );
 
-        if self.is_color {
-            self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-        }
+        //if self.is_color {
+        //    self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        //}
 
         //let _ = io::stdout().flush();
     }
 
     fn write_stderr( &mut self, val: &str, color: Color ) {
         if self.is_color {
-            self.term_stderr.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+            if self.color_err != color {
+                self.term_stderr.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
+                self.color_err = color;
+            }
         }
 
         write!( self.term_stderr, "{}", val ).unwrap_or_else( |_| { process::exit( 1 ); } );
 
-        if self.is_color {
-            self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-        }
+        //if self.is_color {
+        //    self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        //}
 
         //let _ = io::stderr().flush();
     }

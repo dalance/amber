@@ -76,6 +76,7 @@ impl SimplePipelineMatcher {
                 for i in 0..check_bytes {
                     if src[i] <= 0x08 {
                         is_binary = true;
+                        break;
                     }
                 }
                 if is_binary {
