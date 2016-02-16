@@ -58,6 +58,8 @@ Experimental Options:
 
 #[allow(dead_code)]
 static VERSION: &'static str = env!( "CARGO_PKG_VERSION" );
+static BUILD_TIME  : Option<&'static str> = option_env!( "BUILD_TIME"   );
+static GIT_REVISION: Option<&'static str> = option_env!( "GIT_REVISION" );
 
 #[derive(RustcDecodable, Debug)]
 struct Args {
@@ -96,7 +98,11 @@ fn main() {
     // ---------------------------------------------------------------------------------------------
 
     // - Create config from Docopt ---------------------------------------------
-    let version = format!( "ambs version {}", VERSION );
+    let version = if BUILD_TIME.is_some() {
+        format!( "ambs version {} ( {} {} )", VERSION, GIT_REVISION.unwrap_or( "" ), BUILD_TIME.unwrap() )
+    } else {
+        format!( "ambs version {}", VERSION )
+    };
 
     let usage = String::from( USAGE ).replace( "num_cpus", &format!( "{}", num_cpus::get() ) );
     let args: Args = Docopt::new( usage ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );

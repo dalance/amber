@@ -1,5 +1,10 @@
 #VERSION = $(subst \",, $(subst version =,, $(shell grep version Cargo.toml)))
 VERSION = $(patsubst "%",%, $(word 3, $(shell grep version Cargo.toml)))
+BUILD_TIME = $(shell date +"%Y/%m/%d %H:%M:%S")
+GIT_REVISION = $(shell git log -1 --format="%h")
+
+export BUILD_TIME
+export GIT_REVISION
 
 .PHONY: all test bench bench_sse clean release_lnx64 release_win64 release_osx64
 
