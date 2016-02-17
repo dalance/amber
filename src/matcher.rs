@@ -1,12 +1,10 @@
 use regex::Regex;
+use rlibc::memcmp;
 use scoped_threadpool::Pool;
 use std::cmp;
 use std::collections::HashMap;
 use std::str;
 use std::sync::mpsc;
-
-#[cfg(not(feature = "sse"))]
-use std::process;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Matcher
@@ -54,16 +52,6 @@ macro_rules! cmp_pat_sse (
                     pat_rest -= 16;
                 }
             }
-        }
-    );
-);
-
-#[cfg(not(feature = "sse"))]
-macro_rules! cmp_pat_sse (
-    ( $src:expr, $pat:expr, $pat_len:expr, $pat_len_by_dq:expr, $do_mismatch:block ) => (
-        {
-            println!( "sse feature is disabled" );
-            process::exit( 1 );
         }
     );
 );
@@ -139,27 +127,14 @@ impl QuickSearchMatcher {
         let pat_ptr = pat.as_ptr();
         let qs_ptr  = qs_table.as_ptr();
 
-        let pat_len_by_dq = if pat_len % 16 == 0 { pat_len / 16 } else { pat_len / 16 + 1 };
-
         let mut i = beg;
         while i < end {
             if src_len < i+pat_len { break; }
 
-            let mut success = true;
-
-            if self.use_sse {
-                cmp_pat_sse!( src[i], pat[0], pat_len, pat_len_by_dq, { success = false; break; } );
-            } else {
-                let mut j = 0;
-                while j < pat_len {
-                    unsafe {
-                        if *src_ptr.offset( ( i + j ) as isize ) != *pat_ptr.offset( j as isize ) {
-                            success = false;
-                            break;
-                        }
-                    }
-                    j += 1;
-                }
+            let success;
+            unsafe {
+                let ret = memcmp( src_ptr.offset( i as isize ), pat_ptr, pat_len );
+                success = if ret == 0 { true } else { false };
             }
 
             if success {
@@ -256,7 +231,8 @@ impl TbmMatcher {
         let pat_len = pat.len();
         let mut ret = Vec::new();
 
-        let pat_len_by_dq = if pat_len % 16 == 0 { pat_len / 16 } else { pat_len / 16 + 1 };
+        let src_ptr = src.as_ptr();
+        let pat_ptr = pat.as_ptr();
 
         let mut i = beg + pat_len - 1;
         'outer: while i < end {
@@ -271,14 +247,11 @@ impl TbmMatcher {
                 break;
             }
 
-            if self.use_sse {
-                cmp_pat_sse!( src[i-pat_len+1], pat[0], pat_len, pat_len_by_dq, { i += md2; continue 'outer; } );
-            } else {
-                for j in 0 .. pat_len - 1 {
-                    if src[i-pat_len+1+j] != pat[j] {
-                        i += md2;
-                        continue 'outer;
-                    }
+            unsafe {
+                let ret = memcmp( src_ptr.offset( ( i - pat_len + 1 ) as isize ), pat_ptr, pat_len );
+                if ret != 0 {
+                    i += md2;
+                    continue 'outer;
                 }
             }
 

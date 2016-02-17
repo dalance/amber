@@ -340,4 +340,6 @@ fn main() {
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
         console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );
     }
+
+    console.reset();
 }

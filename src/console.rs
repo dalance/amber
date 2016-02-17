@@ -26,6 +26,8 @@ pub struct Console {
     term_stderr : Box<StderrTerminal>,
     color_out   : Color,
     color_err   : Color,
+    colored_out : bool,
+    colored_err : bool,
 }
 
 impl Console {
@@ -36,6 +38,8 @@ impl Console {
             is_color   : true,
             color_out  : term::color::BLACK,
             color_err  : term::color::BLACK,
+            colored_out: false,
+            colored_err: false,
         }
     }
 
@@ -80,8 +84,12 @@ impl Console {
     }
 
     pub fn reset( &mut self ) {
-        self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-        self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        if self.colored_out {
+            self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        }
+        if self.colored_err {
+            self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
+        }
     }
 
     pub fn write_match_line( &mut self, src: &[u8], m: &Match ) {
@@ -111,7 +119,8 @@ impl Console {
         if self.is_color {
             if self.color_out != color {
                 self.term_stdout.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
-                self.color_out = color;
+                self.color_out   = color;
+                self.colored_out = true;
             }
         }
 
@@ -128,7 +137,8 @@ impl Console {
         if self.is_color {
             if self.color_err != color {
                 self.term_stderr.fg( color ).unwrap_or_else( |_| { process::exit( 1 ); } );
-                self.color_err = color;
+                self.color_err   = color;
+                self.colored_err = true;
             }
         }
 
