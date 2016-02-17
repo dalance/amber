@@ -5,11 +5,12 @@ extern crate rustc_serialize;
 
 use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{Matcher, RegexMatcher, QuickSearchMatcher, TbmMatcher};
-use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
-use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
-use amber::pipeline_queue::{PipelineQueue, SimplePipelineQueue};
-use amber::pipeline_replacer::{PipelineReplacer, SimplePipelineReplacer};
-use amber::util::{decode_error, read_from_file, PipelineInfo};
+use amber::pipeline::{PipelineInfo};
+//use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
+//use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
+//use amber::pipeline_queue::{PipelineQueue, SimplePipelineQueue};
+//use amber::pipeline_replacer::{PipelineReplacer, SimplePipelineReplacer};
+use amber::util::{decode_error, read_from_file};
 use docopt::Docopt;
 use std::io::Write;
 use std::path::PathBuf;
@@ -158,6 +159,7 @@ fn main() {
         None => args.arg_replacement.clone().into_bytes()
     };
 
+    /*
     // ---------------------------------------------------------------------------------------------
     // Pipeline Construct
     // ---------------------------------------------------------------------------------------------
@@ -342,4 +344,5 @@ fn main() {
     }
 
     console.reset();
+    */
 }

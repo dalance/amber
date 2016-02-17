@@ -1,24 +1,17 @@
 use console::{Console, ConsoleTextKind};
 use memmap::{Mmap, Protection};
+use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
 use std::io::Error;
 use std::sync::mpsc::{Receiver, Sender};
 use time;
-use util::{catch, decode_error, PipelineInfo};
+use util::{catch, decode_error};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelinePrinter
 // ---------------------------------------------------------------------------------------------------------------------
 
-pub trait PipelinePrinter {
-    fn print( &mut self, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> );
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// SimplePipelinePrinter
-// ---------------------------------------------------------------------------------------------------------------------
-
-pub struct SimplePipelinePrinter {
+pub struct PipelinePrinter {
     pub is_color    : bool,
     pub print_file  : bool,
     pub print_column: bool,
@@ -30,9 +23,9 @@ pub struct SimplePipelinePrinter {
     time_bsy        : u64,
 }
 
-impl SimplePipelinePrinter {
+impl PipelinePrinter {
     pub fn new() -> Self {
-        SimplePipelinePrinter {
+        PipelinePrinter {
             is_color    : true,
             print_file  : true,
             print_column: false,
@@ -84,15 +77,15 @@ impl SimplePipelinePrinter {
     }
 }
 
-impl PipelinePrinter for SimplePipelinePrinter {
-    fn print( &mut self, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
+impl Pipeline<PathMatch, ()> for PipelinePrinter {
+    fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
         loop {
             match rx.recv() {
-                Ok( PipelineInfo::Ok( pm ) ) => {
+                Ok( PipelineInfo::Ok( x, pm ) ) => {
                     let beg = time::precise_time_ns();
 
                     self.print_match( pm );
-                    let _ = tx.send( PipelineInfo::Ok( () ) );
+                    let _ = tx.send( PipelineInfo::Ok( x, () ) );
 
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
@@ -107,19 +100,19 @@ impl PipelinePrinter for SimplePipelinePrinter {
                 },
 
                 Ok( PipelineInfo::End( x ) ) => {
-                    for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
-                    for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
+                    for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( id, i.clone() ) ); }
+                    for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( id, e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::Time( id, self.time_bsy, self.time_end - self.time_beg ) );
                     let _ = tx.send( PipelineInfo::End( x ) );
                     break;
                 },
 
-                Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
-                Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
-                Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
-                Err( _                            ) => break,
+                Ok ( PipelineInfo::Info( i, e      ) ) => { let _ = tx.send( PipelineInfo::Info( i, e      ) ); },
+                Ok ( PipelineInfo::Err ( i, e      ) ) => { let _ = tx.send( PipelineInfo::Err ( i, e      ) ); },
+                Ok ( PipelineInfo::Time( i, t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( i, t0, t1 ) ); },
+                Err( _                               ) => break,
             }
         }
     }

@@ -1,30 +1,25 @@
+use ignore::{Ignore, IgnoreGit, IgnoreVcs};
+use pipeline::{PipelineFork, PipelineInfo};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use time;
-use util::PipelineInfo;
-use ignore::{Ignore, IgnoreGit, IgnoreVcs};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// PathInfo
+// ---------------------------------------------------------------------------------------------------------------------
+
+#[derive(Debug,Clone)]
+pub struct PathInfo {
+    pub path: PathBuf,
+    pub len : u64    ,
+}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineFinder
 // ---------------------------------------------------------------------------------------------------------------------
 
-#[derive(Debug,Clone)]
-pub struct PathInfo {
-    pub id  : usize  ,
-    pub path: PathBuf,
-    pub len : u64    ,
-}
-
-pub trait PipelineFinder {
-    fn find( &mut self, rx: Receiver<PipelineInfo<PathBuf>>, tx: Sender<PipelineInfo<PathInfo>> );
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// SimplePipelineFinder
-// ---------------------------------------------------------------------------------------------------------------------
-
-pub struct SimplePipelineFinder {
+pub struct PipelineFinder {
     pub is_recursive  : bool,
     pub follow_symlink: bool,
     pub skip_vcs      : bool,
@@ -37,14 +32,15 @@ pub struct SimplePipelineFinder {
     time_beg          : u64,
     time_end          : u64,
     time_bsy          : u64,
-    current_id        : usize,
+    msg_id            : usize,
+    current_tx        : usize,
     ignore_vcs        : IgnoreVcs,
     ignore_git        : Vec<IgnoreGit>,
 }
 
-impl SimplePipelineFinder {
+impl PipelineFinder {
     pub fn new() -> Self {
-        SimplePipelineFinder {
+        PipelineFinder {
             is_recursive  : true,
             follow_symlink: true,
             skip_vcs      : true,
@@ -57,13 +53,14 @@ impl SimplePipelineFinder {
             time_beg      : 0,
             time_end      : 0,
             time_bsy      : 0,
-            current_id    : 0,
+            msg_id        : 0,
+            current_tx    : 0,
             ignore_vcs    : IgnoreVcs::new(),
             ignore_git    : Vec::new(),
         }
     }
 
-    fn find_path( &mut self, base: PathBuf, tx: &Sender<PipelineInfo<PathInfo>> ) {
+    fn find_path( &mut self, base: PathBuf, tx: &Vec<Sender<PipelineInfo<PathInfo>>> ) {
 
         let attr = match fs::metadata( &base ) {
             Ok ( x ) => x,
@@ -113,10 +110,11 @@ impl SimplePipelineFinder {
         }
     }
 
-    fn send_path( &mut self, path: PathBuf, len: u64, tx: &Sender<PipelineInfo<PathInfo>> ) {
+    fn send_path( &mut self, path: PathBuf, len: u64, tx: &Vec<Sender<PipelineInfo<PathInfo>>> ) {
         if self.check_file( &path ) {
-            let _ = tx.send( PipelineInfo::Ok( PathInfo{ id: self.current_id, path: path, len: len } ) );
-            self.current_id += 1;
+            let _ = tx[self.current_tx].send( PipelineInfo::Ok( self.msg_id, PathInfo{ path: path, len: len } ) );
+            self.msg_id += 1;
+            self.current_tx = if self.current_tx == tx.len() - 1 { 0 } else { self.current_tx + 1 };
         }
     }
 
@@ -202,11 +200,11 @@ impl SimplePipelineFinder {
     }
 }
 
-impl PipelineFinder for SimplePipelineFinder {
-    fn find( &mut self, rx: Receiver<PipelineInfo<PathBuf>>, tx: Sender<PipelineInfo<PathInfo>> ) {
+impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
+    fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathBuf>>, tx: Vec<Sender<PipelineInfo<PathInfo>>> ) {
         loop {
             match rx.recv() {
-                Ok( PipelineInfo::Ok( p ) ) => {
+                Ok( PipelineInfo::Ok( _, p ) ) => {
                     let beg = time::precise_time_ns();
 
                     self.set_default_gitignore( &p );
@@ -217,30 +215,37 @@ impl PipelineFinder for SimplePipelineFinder {
                 },
 
                 Ok( PipelineInfo::Beg( x ) ) => {
-                    self.current_id = x;
+                    self.msg_id = x;
 
                     self.infos  = Vec::new();
                     self.errors = Vec::new();
 
                     self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Beg( x ) );
+
+                    for tx in &tx {
+                        let _ = tx.send( PipelineInfo::Beg( x ) );
+                    }
                 },
 
                 Ok( PipelineInfo::End( _ ) ) => {
-                    for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
-                    for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
+                    for i in &self.infos  { let _ = tx[0].send( PipelineInfo::Info( id, i.clone() ) ); }
+                    for e in &self.errors { let _ = tx[0].send( PipelineInfo::Err ( id, e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End( self.current_id ) );
+                    let _ = tx[0].send( PipelineInfo::Time( id, self.time_bsy, self.time_end - self.time_beg ) );
+
+
+                    for tx in &tx {
+                        let _ = tx.send( PipelineInfo::End( self.msg_id ) );
+                    }
 
                     break;
                 },
 
-                Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
-                Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
-                Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
-                Err( _                            ) => break,
+                Ok ( PipelineInfo::Info( i, e      ) ) => { let _ = tx[0].send( PipelineInfo::Info( i, e      ) ); },
+                Ok ( PipelineInfo::Err ( i, e      ) ) => { let _ = tx[0].send( PipelineInfo::Err ( i, e      ) ); },
+                Ok ( PipelineInfo::Time( i, t0, t1 ) ) => { let _ = tx[0].send( PipelineInfo::Time( i, t0, t1 ) ); },
+                Err( _                               ) => break,
             }
         }
     }
@@ -256,24 +261,24 @@ mod tests {
     use std::path::PathBuf;
     use std::thread;
     use std::sync::mpsc;
-    use util::PipelineInfo;
+    use pipeline::{PipelineFork, PipelineInfo};
 
-    fn test<T: 'static+PipelineFinder+Send>( mut finder: T, path: String ) -> Vec<PathInfo> {
+    fn test<T: 'static+PipelineFork<PathBuf, PathInfo>+Send>( mut finder: T, path: String ) -> Vec<PathInfo> {
         let ( in_tx , in_rx  ) = mpsc::channel();
         let ( out_tx, out_rx ) = mpsc::channel();
         thread::spawn( move || {
-            finder.find( in_rx, out_tx );
+            finder.setup( 0, in_rx, vec![out_tx] );
         } );
-        let _ = in_tx.send( PipelineInfo::Beg( 0                     ) );
-        let _ = in_tx.send( PipelineInfo::Ok ( PathBuf::from( path ) ) );
-        let _ = in_tx.send( PipelineInfo::End( 0                     ) );
+        let _ = in_tx.send( PipelineInfo::Beg( 0                        ) );
+        let _ = in_tx.send( PipelineInfo::Ok ( 1, PathBuf::from( path ) ) );
+        let _ = in_tx.send( PipelineInfo::End( 2                        ) );
 
         let mut ret = Vec::new();
         loop {
             match out_rx.recv().unwrap() {
-                PipelineInfo::Ok  ( x      ) => ret.push( x ),
-                PipelineInfo::End ( _      ) => break,
-                _                            => (),
+                PipelineInfo::Ok  ( _, x ) => ret.push( x ),
+                PipelineInfo::End ( _    ) => break,
+                _                          => (),
             }
         }
 
@@ -281,8 +286,8 @@ mod tests {
     }
 
     #[test]
-    fn simple_pipeline_finder_default() {
-        let finder = SimplePipelineFinder::new();
+    fn pipeline_finder_default() {
+        let finder = PipelineFinder::new();
         let ret = test( finder, "./".to_string() );
 
         assert!(  ret.iter().any( |x| x.path == PathBuf::from( "./Cargo.toml"     ) ) );
@@ -296,8 +301,8 @@ mod tests {
     }
 
     #[test]
-    fn simple_pipeline_finder_not_skip_vcs() {
-        let mut finder = SimplePipelineFinder::new();
+    fn pipeline_finder_not_skip_vcs() {
+        let mut finder = PipelineFinder::new();
         finder.skip_vcs = false;
         let ret = test( finder, "./".to_string() );
 

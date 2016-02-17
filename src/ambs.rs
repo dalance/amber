@@ -5,11 +5,12 @@ extern crate rustc_serialize;
 
 use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{Matcher, RegexMatcher, QuickSearchMatcher, TbmMatcher};
-use amber::pipeline_finder::{PipelineFinder, SimplePipelineFinder};
-use amber::pipeline_matcher::{PipelineMatcher, SimplePipelineMatcher};
-use amber::pipeline_queue::{PipelineQueue, SimplePipelineQueue};
-use amber::pipeline_printer::{PipelinePrinter, SimplePipelinePrinter};
-use amber::util::{decode_error, read_from_file, PipelineInfo};
+use amber::pipeline::{Pipeline, PipelineFork, PipelineJoin, PipelineInfo};
+use amber::pipeline_finder::PipelineFinder;
+use amber::pipeline_matcher::PipelineMatcher;
+use amber::pipeline_queue::PipelineQueue;
+use amber::pipeline_printer::PipelinePrinter;
+use amber::util::{decode_error, read_from_file};
 use docopt::Docopt;
 use std::io::Write;
 use std::path::PathBuf;
@@ -144,6 +145,7 @@ fn main() {
     // Pipeline Construct
     // ---------------------------------------------------------------------------------------------
 
+    /*
     let matcher_num = args.flag_max_threads;
 
     let ( finder_in_tx   , finder_in_rx    ) = mpsc::channel();
@@ -156,9 +158,9 @@ fn main() {
     let mut matcher_in_tx  = Vec::new();
     let mut matcher_out_rx = Vec::new();
 
-    let mut finder   = SimplePipelineFinder::new();
-    let mut queue    = SimplePipelineQueue::new();
-    let mut printer  = SimplePipelinePrinter::new();
+    let mut finder   = PipelineFinder::new();
+    let mut queue    = PipelineQueue::new();
+    let mut printer  = PipelinePrinter::new();
 
     finder.is_recursive     = !args.flag_no_recursive;
     finder.follow_symlink   = !args.flag_no_symlink;
@@ -170,7 +172,7 @@ fn main() {
     printer.print_column    = args.flag_column;
 
     let _ = thread::Builder::new().name( "finder".to_string() ).spawn( move || {
-        finder.find( finder_in_rx, finder_out_tx );
+        finder.setup( 0, finder_in_rx, finder_out_tx );
     } );
 
     for _ in 0..matcher_num {
@@ -323,4 +325,5 @@ fn main() {
     }
 
     console.reset();
+    */
 }
