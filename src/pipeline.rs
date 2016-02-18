@@ -1,12 +1,12 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 pub enum PipelineInfo<T> {
-    Beg ( usize           ),
-    Ok  ( usize, T        ),
-    End ( usize           ),
-    Info( usize, String   ),
-    Err ( usize, String   ),
-    Time( usize, u64, u64 ),
+    SeqBeg ( usize           ),
+    SeqDat ( usize, T        ),
+    SeqEnd ( usize           ),
+    MsgInfo( usize, String   ),
+    MsgErr ( usize, String   ),
+    MsgTime( usize, u64, u64 ),
 }
 
 pub trait Pipeline<T,U> {

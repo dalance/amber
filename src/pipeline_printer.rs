@@ -79,60 +79,45 @@ impl PipelinePrinter {
 
 impl Pipeline<PathMatch, ()> for PipelinePrinter {
     fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
+        self.infos  = Vec::new();
+        self.errors = Vec::new();
+        let mut seq_beg_arrived = false;
+
         loop {
             match rx.recv() {
-                Ok( PipelineInfo::Ok( x, pm ) ) => {
+                Ok( PipelineInfo::SeqDat( x, pm ) ) => {
                     let beg = time::precise_time_ns();
 
                     self.print_match( pm );
-                    let _ = tx.send( PipelineInfo::Ok( x, () ) );
+                    let _ = tx.send( PipelineInfo::SeqDat( x, () ) );
 
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
 
-                Ok( PipelineInfo::Beg( x ) ) => {
-                    self.infos  = Vec::new();
-                    self.errors = Vec::new();
-
-                    self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Beg( x ) );
+                Ok( PipelineInfo::SeqBeg( x ) ) => {
+                    if !seq_beg_arrived {
+                        self.time_beg = time::precise_time_ns();
+                        let _ = tx.send( PipelineInfo::SeqBeg( x ) );
+                        seq_beg_arrived = true;
+                    }
                 },
 
-                Ok( PipelineInfo::End( x ) ) => {
-                    for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( id, i.clone() ) ); }
-                    for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( id, e.clone() ) ); }
+                Ok( PipelineInfo::SeqEnd( x ) ) => {
+                    for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
+                    for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Time( id, self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End( x ) );
+                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::SeqEnd( x ) );
                     break;
                 },
 
-                Ok ( PipelineInfo::Info( i, e      ) ) => { let _ = tx.send( PipelineInfo::Info( i, e      ) ); },
-                Ok ( PipelineInfo::Err ( i, e      ) ) => { let _ = tx.send( PipelineInfo::Err ( i, e      ) ); },
-                Ok ( PipelineInfo::Time( i, t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( i, t0, t1 ) ); },
-                Err( _                               ) => break,
+                Ok ( PipelineInfo::MsgInfo( i, e      ) ) => { let _ = tx.send( PipelineInfo::MsgInfo( i, e      ) ); },
+                Ok ( PipelineInfo::MsgErr ( i, e      ) ) => { let _ = tx.send( PipelineInfo::MsgErr ( i, e      ) ); },
+                Ok ( PipelineInfo::MsgTime( i, t0, t1 ) ) => { let _ = tx.send( PipelineInfo::MsgTime( i, t0, t1 ) ); },
+                Err( _                                  ) => break,
             }
         }
     }
 }
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Test
-// ---------------------------------------------------------------------------------------------------------------------
-
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//    use matcher::QuickSearchMatcher;
-//    use std::path::PathBuf;
-//    use std::thread;
-//    use std::sync::mpsc;
-//    use util::PipelineInfo;
-//
-//    #[test]
-//    fn test_simple_pipeline_printer() {
-//    }
-//}
-

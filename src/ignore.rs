@@ -9,6 +9,7 @@ use std::path::PathBuf;
 // ---------------------------------------------------------------------------------------------------------------------
 
 pub trait Ignore {
+    fn is_ignore( &self, path: &PathBuf, is_dir: bool ) -> bool;
     fn check_dir ( &self, path: &PathBuf ) -> bool;
     fn check_file( &self, path: &PathBuf ) -> bool;
 }
@@ -35,6 +36,16 @@ impl IgnoreVcs {
 }
 
 impl Ignore for IgnoreVcs {
+    fn is_ignore( &self, path: &PathBuf, is_dir: bool ) -> bool {
+        if is_dir {
+            for d in &self.vcs_dirs {
+                if path.ends_with( d ) {
+                    return true
+                }
+            }
+        }
+        false
+    }
 
     fn check_dir ( &self, path: &PathBuf ) -> bool {
         for d in &self.vcs_dirs {
@@ -228,9 +239,61 @@ impl IgnoreGit {
 
         true
     }
+
+    fn is_ignore_sub ( &self, path: &PathBuf, names: &Vec<IgnoreGitPat>, paths: &Vec<IgnoreGitPat> ) -> bool {
+
+        let path_str = path.to_string_lossy();
+        let name_str = if let Some( x ) = path.file_name() {
+            x.to_string_lossy()
+        } else {
+            return false
+        };
+
+        let name_ptr = name_str.as_bytes().as_ptr();
+        let path_ptr = path_str.as_bytes().as_ptr();
+        let name_end = ( name_str.len() - 1 ) as isize;
+        let path_end = ( path_str.len() - 1 ) as isize;
+
+        for p in names {
+            unsafe {
+                if ( p.head != 0 ) && ( *name_ptr != p.head ) {
+                    continue;
+                }
+                if ( p.tail != 0 ) && ( *name_ptr.offset( name_end ) != p.tail ) {
+                    continue;
+                }
+            }
+            if p.pat.matches_with( &name_str, &self.opt ) {
+                return true
+            }
+        }
+
+        for p in paths {
+            unsafe {
+                if ( p.head != 0 ) && ( *path_ptr != p.head ) {
+                    continue;
+                }
+                if ( p.tail != 0 ) && ( *path_ptr.offset( path_end ) != p.tail ) {
+                    continue;
+                }
+            }
+            if p.pat.matches_with( &path_str, &self.opt ) {
+                return true
+            }
+        }
+
+        false
+    }
 }
 
 impl Ignore for IgnoreGit {
+    fn is_ignore( &self, path: &PathBuf, is_dir: bool ) -> bool {
+        if is_dir {
+            self.is_ignore_sub( path, &self.dir_name, &self.dir_path )
+        } else {
+            self.is_ignore_sub( path, &self.file_name, &self.file_path )
+        }
+    }
 
     fn check_dir ( &self, path: &PathBuf ) -> bool {
         self.check( path, &self.dir_name, &self.dir_path )
@@ -254,27 +317,27 @@ mod tests {
     fn ignore_git() {
         let ignore = IgnoreGit::new( &PathBuf::from( "./test/.gitignore" ) );
 
-        assert!(  ignore.check_file( &PathBuf::from( "./test/ao"          ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/a.o"         ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/abc.o"       ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/a.s"         ) ) );
-        assert!(  ignore.check_file( &PathBuf::from( "./test/abc.s"       ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/d0.t"        ) ) );
-        assert!(  ignore.check_file( &PathBuf::from( "./test/d00.t"       ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/file"        ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/dir0/file"   ) ) );
-        assert!( !ignore.check_file( &PathBuf::from( "./test/dir1/file"   ) ) );
-        assert!(  ignore.check_file( &PathBuf::from( "./test/x/file"      ) ) );
-        assert!(  ignore.check_file( &PathBuf::from( "./test/x/dir0/file" ) ) );
-        assert!(  ignore.check_file( &PathBuf::from( "./test/x/dir1/file" ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir2"        ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir3/dir4"   ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir5/dir6"   ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir7"        ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir3/dir7"   ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir8"        ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir9/dir10"  ) ) );
-        assert!( !ignore.check_dir ( &PathBuf::from( "./test/dir11/dir12" ) ) );
+        assert!( !ignore.is_ignore( &PathBuf::from( "./test/ao"          ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/a.o"         ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/abc.o"       ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/a.s"         ), false ) );
+        assert!( !ignore.is_ignore( &PathBuf::from( "./test/abc.s"       ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/d0.t"        ), false ) );
+        assert!( !ignore.is_ignore( &PathBuf::from( "./test/d00.t"       ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/file"        ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir0/file"   ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir1/file"   ), false ) );
+        assert!( !ignore.is_ignore( &PathBuf::from( "./test/x/file"      ), false ) );
+        assert!( !ignore.is_ignore( &PathBuf::from( "./test/x/dir0/file" ), false ) );
+        assert!( !ignore.is_ignore( &PathBuf::from( "./test/x/dir1/file" ), false ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir2"        ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir3/dir4"   ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir5/dir6"   ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir7"        ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir3/dir7"   ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir8"        ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir9/dir10"  ), true  ) );
+        assert!(  ignore.is_ignore( &PathBuf::from( "./test/dir11/dir12" ), true  ) );
     }
 }
 

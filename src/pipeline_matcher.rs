@@ -2,6 +2,7 @@ use matcher::{Match, Matcher};
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_finder::PathInfo;
+use std::cell::RefCell;
 use std::io::{Error, Read};
 use std::fs::File;
 use std::path::PathBuf;
@@ -23,7 +24,7 @@ pub struct PathMatch {
 // PipelineMatcher
 // ---------------------------------------------------------------------------------------------------------------------
 
-pub struct PipelineMatcher<T: Matcher> {
+pub struct PipelineMatcher<'a, T: Matcher> {
     pub skip_binary       : bool,
     pub print_skipped     : bool,
     pub binary_check_bytes: usize,
@@ -34,11 +35,11 @@ pub struct PipelineMatcher<T: Matcher> {
     time_end              : u64,
     time_bsy              : u64,
     matcher               : T,
-    keyword               : Vec<u8>,
+    keyword               : RefCell<&'a [u8]>,
 }
 
-impl<T: Matcher> PipelineMatcher<T> {
-    pub fn new( matcher: T, keyword: &[u8] ) -> Self {
+impl<'a, T: Matcher> PipelineMatcher<'a, T> {
+    pub fn new( matcher: T, keyword: &'a [u8] ) -> Self {
         PipelineMatcher {
             skip_binary       : true,
             print_skipped     : false,
@@ -50,7 +51,7 @@ impl<T: Matcher> PipelineMatcher<T> {
             time_end          : 0,
             time_bsy          : 0,
             matcher           : matcher,
-            keyword           : Vec::from( keyword ),
+            keyword           : RefCell::new( keyword ),
         }
     }
 
@@ -87,7 +88,7 @@ impl<T: Matcher> PipelineMatcher<T> {
                 }
             }
 
-            let ret = self.matcher.search( src, &self.keyword );
+            let ret = self.matcher.search( src, &self.keyword.borrow() );
 
             Ok( PathMatch { path: info.path.clone(), matches: ret } )
         } );
@@ -102,42 +103,47 @@ impl<T: Matcher> PipelineMatcher<T> {
     }
 }
 
-impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
+impl<'a, T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<'a, T> {
     fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathInfo>>, tx: Sender<PipelineInfo<PathMatch>> ) {
+        self.infos  = Vec::new();
+        self.errors = Vec::new();
+        let mut seq_beg_arrived = false;
+
         loop {
             match rx.recv() {
-                Ok( PipelineInfo::Ok( x, p ) ) => {
+                Ok( PipelineInfo::SeqDat( x, p ) ) => {
                     let beg = time::precise_time_ns();
 
                     let ret = self.search_path( p );
-                    let _ = tx.send( PipelineInfo::Ok( x, ret ) );
+                    let _ = tx.send( PipelineInfo::SeqDat( x, ret ) );
 
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
 
-                Ok( PipelineInfo::Beg( x ) ) => {
-                    self.infos  = Vec::new();
-                    self.errors = Vec::new();
-
-                    self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Beg( x ) );
+                Ok( PipelineInfo::SeqBeg( x ) ) => {
+                    if !seq_beg_arrived {
+                        self.time_beg = time::precise_time_ns();
+                        let _ = tx.send( PipelineInfo::SeqBeg( x ) );
+                        seq_beg_arrived = true;
+                    }
                 },
 
-                Ok( PipelineInfo::End( x ) ) => {
-                    for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( id, i.clone() ) ); }
-                    for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( id, e.clone() ) ); }
+                Ok( PipelineInfo::SeqEnd( x ) ) => {
+                    for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
+                    for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
+                    //println!( "{} {} {}", id, self.time_bsy, self.time_end - self.time_beg );
                     self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Time( id, self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End( x ) );
+                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::SeqEnd( x ) );
                     break;
                 },
 
-                Ok ( PipelineInfo::Info( i, e      ) ) => { let _ = tx.send( PipelineInfo::Info( i, e      ) ); },
-                Ok ( PipelineInfo::Err ( i, e      ) ) => { let _ = tx.send( PipelineInfo::Err ( i, e      ) ); },
-                Ok ( PipelineInfo::Time( i, t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( i, t0, t1 ) ); },
-                Err( _                               ) => break,
+                Ok ( PipelineInfo::MsgInfo( i, e      ) ) => { let _ = tx.send( PipelineInfo::MsgInfo( i, e      ) ); },
+                Ok ( PipelineInfo::MsgErr ( i, e      ) ) => { let _ = tx.send( PipelineInfo::MsgErr ( i, e      ) ); },
+                Ok ( PipelineInfo::MsgTime( i, t0, t1 ) ) => { let _ = tx.send( PipelineInfo::MsgTime( i, t0, t1 ) ); },
+                Err( _                                  ) => break,
             }
         }
     }
@@ -169,21 +175,21 @@ mod tests {
             matcher.setup( 0, in_rx, out_tx );
         } );
 
-        let _ = in_tx.send( PipelineInfo::Beg( 0                                                             ) );
-        let _ = in_tx.send( PipelineInfo::Ok ( 0, PathInfo{ path: PathBuf::from( "./src/ambs.rs" ), len: 1 } ) );
-        let _ = in_tx.send( PipelineInfo::Ok ( 1, PathInfo{ path: PathBuf::from( "./src/ambr.rs" ), len: 1 } ) );
-        let _ = in_tx.send( PipelineInfo::Ok ( 2, PathInfo{ path: PathBuf::from( "./src/util.rs" ), len: 1 } ) );
-        let _ = in_tx.send( PipelineInfo::End( 3                                                             ) );
+        let _ = in_tx.send( PipelineInfo::SeqBeg( 0                                                             ) );
+        let _ = in_tx.send( PipelineInfo::SeqDat( 0, PathInfo{ path: PathBuf::from( "./src/ambs.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::SeqDat( 1, PathInfo{ path: PathBuf::from( "./src/ambr.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::SeqDat( 2, PathInfo{ path: PathBuf::from( "./src/util.rs" ), len: 1 } ) );
+        let _ = in_tx.send( PipelineInfo::SeqEnd( 3                                                             ) );
 
         let mut ret = Vec::new();
         let mut time_bsy = 0;
         let mut time_all = 0;
         loop {
             match out_rx.recv().unwrap() {
-                PipelineInfo::Ok  ( _, x      ) => ret.push( x ),
-                PipelineInfo::Time( _, t0, t1 ) => { time_bsy = t0; time_all = t1; },
-                PipelineInfo::End ( _         ) => break,
-                _                               => (),
+                PipelineInfo::SeqDat ( _, x      ) => ret.push( x ),
+                PipelineInfo::SeqEnd ( _         ) => break,
+                PipelineInfo::MsgTime( _, t0, t1 ) => { time_bsy = t0; time_all = t1; },
+                _                                  => (),
             }
         }
 

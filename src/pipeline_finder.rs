@@ -32,7 +32,7 @@ pub struct PipelineFinder {
     time_beg          : u64,
     time_end          : u64,
     time_bsy          : u64,
-    msg_id            : usize,
+    seq_no            : usize,
     current_tx        : usize,
     ignore_vcs        : IgnoreVcs,
     ignore_git        : Vec<IgnoreGit>,
@@ -53,7 +53,7 @@ impl PipelineFinder {
             time_beg      : 0,
             time_end      : 0,
             time_bsy      : 0,
-            msg_id        : 0,
+            seq_no        : 0,
             current_tx    : 0,
             ignore_vcs    : IgnoreVcs::new(),
             ignore_git    : Vec::new(),
@@ -97,7 +97,7 @@ impl PipelineFinder {
                         } else {
                             let find_dir     = file_type.is_dir()     & self.is_recursive;
                             let find_symlink = file_type.is_symlink() & self.is_recursive & self.follow_symlink;
-                            if ( find_dir | find_symlink ) & self.check_dir( &entry.path() ) {
+                            if ( find_dir | find_symlink ) & self.check_path( &entry.path(), true ) {
                                 self.find_path( entry.path(), &tx );
                             }
                         }
@@ -111,9 +111,9 @@ impl PipelineFinder {
     }
 
     fn send_path( &mut self, path: PathBuf, len: u64, tx: &Vec<Sender<PipelineInfo<PathInfo>>> ) {
-        if self.check_file( &path ) {
-            let _ = tx[self.current_tx].send( PipelineInfo::Ok( self.msg_id, PathInfo{ path: path, len: len } ) );
-            self.msg_id += 1;
+        if self.check_path( &path, false ) {
+            let _ = tx[self.current_tx].send( PipelineInfo::SeqDat( self.seq_no, PathInfo{ path: path, len: len } ) );
+            self.seq_no += 1;
             self.current_tx = if self.current_tx == tx.len() - 1 { 0 } else { self.current_tx + 1 };
         }
     }
@@ -121,17 +121,19 @@ impl PipelineFinder {
     fn push_gitignore( &mut self, path: &PathBuf ) -> bool {
         if !self.skip_gitignore { return false }
 
-        let mut reader = fs::read_dir( &path ).unwrap();
-        let gitignore = reader.find( |x| {
-            match x {
-                &Ok ( ref x ) => x.path().ends_with( ".gitignore" ),
-                &Err( _     ) => false,
-            } 
-        } );
-        match gitignore {
-            Some( Ok( x ) ) => { self.ignore_git.push( IgnoreGit::new( &x.path() ) ); true },
-            _               => false,
+        let reader = fs::read_dir( &path ).unwrap();
+        for i in reader {
+            match i {
+                Ok( entry ) => {
+                    if entry.path().ends_with( ".gitignore" ) {
+                        self.ignore_git.push( IgnoreGit::new( &entry.path() ) );
+                        return true;
+                    }
+                },
+                Err( e ) => self.errors.push( format!( "Error: {}", e ) ),
+            }
         }
+        false
     }
 
     fn pop_gitignore( &mut self, exist: bool ) {
@@ -140,29 +142,15 @@ impl PipelineFinder {
         }
     }
 
-    fn check_dir( &mut self, path: &PathBuf ) -> bool {
-        let ok_vcs = if self.skip_vcs { self.ignore_vcs.check_dir( &path ) } else { true };
-        let ok_git = if self.skip_gitignore && !self.ignore_git.is_empty() {
-            self.ignore_git.last().unwrap().check_dir( &path )
+    fn check_path( &mut self, path: &PathBuf, is_dir: bool ) -> bool {
+        let ok_vcs = if self.skip_vcs {
+            !self.ignore_vcs.is_ignore( &path, is_dir )
         } else {
             true
         };
 
-        if !ok_vcs & self.print_skipped {
-            self.infos.push( format!( "Skipped: {:?} ( vcs file )\n", path ) );
-        }
-
-        if !ok_git & self.print_skipped {
-            self.infos.push( format!( "Skipped: {:?} ( .gitignore )\n", path ) );
-        }
-
-        ok_vcs && ok_git
-    }
-
-    fn check_file( &mut self, path: &PathBuf ) -> bool {
-        let ok_vcs = if self.skip_vcs { self.ignore_vcs.check_file( &path ) } else { true };
         let ok_git = if self.skip_gitignore && !self.ignore_git.is_empty() {
-            self.ignore_git.last().unwrap().check_file( &path )
+            !self.ignore_git.last().unwrap().is_ignore( &path, is_dir )
         } else {
             true
         };
@@ -202,9 +190,13 @@ impl PipelineFinder {
 
 impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
     fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathBuf>>, tx: Vec<Sender<PipelineInfo<PathInfo>>> ) {
+        self.infos  = Vec::new();
+        self.errors = Vec::new();
+        let mut seq_beg_arrived = false;
+
         loop {
             match rx.recv() {
-                Ok( PipelineInfo::Ok( _, p ) ) => {
+                Ok( PipelineInfo::SeqDat( _, p ) ) => {
                     let beg = time::precise_time_ns();
 
                     self.set_default_gitignore( &p );
@@ -214,38 +206,37 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
                     self.time_bsy += end - beg;
                 },
 
-                Ok( PipelineInfo::Beg( x ) ) => {
-                    self.msg_id = x;
+                Ok( PipelineInfo::SeqBeg( x ) ) => {
+                    if !seq_beg_arrived {
+                        self.seq_no = x;
+                        self.time_beg = time::precise_time_ns();
 
-                    self.infos  = Vec::new();
-                    self.errors = Vec::new();
+                        for tx in &tx {
+                            let _ = tx.send( PipelineInfo::SeqBeg( x ) );
+                        }
 
-                    self.time_beg = time::precise_time_ns();
-
-                    for tx in &tx {
-                        let _ = tx.send( PipelineInfo::Beg( x ) );
+                        seq_beg_arrived = true;
                     }
                 },
 
-                Ok( PipelineInfo::End( _ ) ) => {
-                    for i in &self.infos  { let _ = tx[0].send( PipelineInfo::Info( id, i.clone() ) ); }
-                    for e in &self.errors { let _ = tx[0].send( PipelineInfo::Err ( id, e.clone() ) ); }
+                Ok( PipelineInfo::SeqEnd( _ ) ) => {
+                    for i in &self.infos  { let _ = tx[0].send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
+                    for e in &self.errors { let _ = tx[0].send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
-                    let _ = tx[0].send( PipelineInfo::Time( id, self.time_bsy, self.time_end - self.time_beg ) );
-
+                    let _ = tx[0].send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
 
                     for tx in &tx {
-                        let _ = tx.send( PipelineInfo::End( self.msg_id ) );
+                        let _ = tx.send( PipelineInfo::SeqEnd( self.seq_no ) );
                     }
 
                     break;
                 },
 
-                Ok ( PipelineInfo::Info( i, e      ) ) => { let _ = tx[0].send( PipelineInfo::Info( i, e      ) ); },
-                Ok ( PipelineInfo::Err ( i, e      ) ) => { let _ = tx[0].send( PipelineInfo::Err ( i, e      ) ); },
-                Ok ( PipelineInfo::Time( i, t0, t1 ) ) => { let _ = tx[0].send( PipelineInfo::Time( i, t0, t1 ) ); },
-                Err( _                               ) => break,
+                Ok ( PipelineInfo::MsgInfo( i, e      ) ) => { let _ = tx[0].send( PipelineInfo::MsgInfo( i, e      ) ); },
+                Ok ( PipelineInfo::MsgErr ( i, e      ) ) => { let _ = tx[0].send( PipelineInfo::MsgErr ( i, e      ) ); },
+                Ok ( PipelineInfo::MsgTime( i, t0, t1 ) ) => { let _ = tx[0].send( PipelineInfo::MsgTime( i, t0, t1 ) ); },
+                Err( _                                  ) => break,
             }
         }
     }
@@ -269,16 +260,16 @@ mod tests {
         thread::spawn( move || {
             finder.setup( 0, in_rx, vec![out_tx] );
         } );
-        let _ = in_tx.send( PipelineInfo::Beg( 0                        ) );
-        let _ = in_tx.send( PipelineInfo::Ok ( 1, PathBuf::from( path ) ) );
-        let _ = in_tx.send( PipelineInfo::End( 2                        ) );
+        let _ = in_tx.send( PipelineInfo::SeqBeg( 0                        ) );
+        let _ = in_tx.send( PipelineInfo::SeqDat( 0, PathBuf::from( path ) ) );
+        let _ = in_tx.send( PipelineInfo::SeqEnd( 1                        ) );
 
         let mut ret = Vec::new();
         loop {
             match out_rx.recv().unwrap() {
-                PipelineInfo::Ok  ( _, x ) => ret.push( x ),
-                PipelineInfo::End ( _    ) => break,
-                _                          => (),
+                PipelineInfo::SeqDat( _, x ) => ret.push( x ),
+                PipelineInfo::SeqEnd( _    ) => break,
+                _                            => (),
             }
         }
 

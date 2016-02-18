@@ -19,7 +19,7 @@ pub mod matcher;
 pub mod pipeline;
 pub mod pipeline_finder;
 pub mod pipeline_matcher;
-pub mod pipeline_queue;
+pub mod pipeline_sorter;
 pub mod pipeline_printer;
 //pub mod pipeline_replacer;
 pub mod util;
