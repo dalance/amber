@@ -24,7 +24,7 @@ pub struct PathMatch {
 // PipelineMatcher
 // ---------------------------------------------------------------------------------------------------------------------
 
-pub struct PipelineMatcher<'a, T: Matcher> {
+pub struct PipelineMatcher<T: Matcher> {
     pub skip_binary       : bool,
     pub print_skipped     : bool,
     pub binary_check_bytes: usize,
@@ -35,11 +35,11 @@ pub struct PipelineMatcher<'a, T: Matcher> {
     time_end              : u64,
     time_bsy              : u64,
     matcher               : T,
-    keyword               : RefCell<&'a [u8]>,
+    keyword               : Vec<u8>,
 }
 
-impl<'a, T: Matcher> PipelineMatcher<'a, T> {
-    pub fn new( matcher: T, keyword: &'a [u8] ) -> Self {
+impl<T: Matcher> PipelineMatcher<T> {
+    pub fn new( matcher: T, keyword: &[u8] ) -> Self {
         PipelineMatcher {
             skip_binary       : true,
             print_skipped     : false,
@@ -51,7 +51,7 @@ impl<'a, T: Matcher> PipelineMatcher<'a, T> {
             time_end          : 0,
             time_bsy          : 0,
             matcher           : matcher,
-            keyword           : RefCell::new( keyword ),
+            keyword           : Vec::from( keyword ),
         }
     }
 
@@ -88,7 +88,7 @@ impl<'a, T: Matcher> PipelineMatcher<'a, T> {
                 }
             }
 
-            let ret = self.matcher.search( src, &self.keyword.borrow() );
+            let ret = self.matcher.search( src, &self.keyword );
 
             Ok( PathMatch { path: info.path.clone(), matches: ret } )
         } );
@@ -103,7 +103,7 @@ impl<'a, T: Matcher> PipelineMatcher<'a, T> {
     }
 }
 
-impl<'a, T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<'a, T> {
+impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
     fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathInfo>>, tx: Sender<PipelineInfo<PathMatch>> ) {
         self.infos  = Vec::new();
         self.errors = Vec::new();

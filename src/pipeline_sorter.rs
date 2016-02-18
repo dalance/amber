@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn pipeline_sorter() {
-        let mut sorter = PipelineSorter::new();
+        let mut sorter = PipelineSorter::new( 1 );
 
         let ( in_tx , in_rx  ) = mpsc::channel();
         let ( out_tx, out_rx ) = mpsc::channel();
