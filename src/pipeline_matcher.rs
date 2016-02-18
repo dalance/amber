@@ -2,7 +2,6 @@ use matcher::{Match, Matcher};
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_finder::PathInfo;
-use std::cell::RefCell;
 use std::io::{Error, Read};
 use std::fs::File;
 use std::path::PathBuf;

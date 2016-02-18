@@ -10,8 +10,6 @@ use std::path::PathBuf;
 
 pub trait Ignore {
     fn is_ignore( &self, path: &PathBuf, is_dir: bool ) -> bool;
-    fn check_dir ( &self, path: &PathBuf ) -> bool;
-    fn check_file( &self, path: &PathBuf ) -> bool;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -45,19 +43,6 @@ impl Ignore for IgnoreVcs {
             }
         }
         false
-    }
-
-    fn check_dir ( &self, path: &PathBuf ) -> bool {
-        for d in &self.vcs_dirs {
-            if path.ends_with( d ) {
-                return false
-            }
-        }
-        true
-    }
-
-    fn check_file( &self, _path: &PathBuf ) -> bool {
-        true
     }
 }
 
@@ -195,51 +180,6 @@ impl IgnoreGit {
         ( head, tail )
     }
 
-    fn check ( &self, path: &PathBuf, names: &Vec<IgnoreGitPat>, paths: &Vec<IgnoreGitPat> ) -> bool {
-
-        let path_str = path.to_string_lossy();
-        let name_str = if let Some( x ) = path.file_name() {
-            x.to_string_lossy()
-        } else {
-            return true
-        };
-
-        let name_ptr = name_str.as_bytes().as_ptr();
-        let path_ptr = path_str.as_bytes().as_ptr();
-        let name_end = ( name_str.len() - 1 ) as isize;
-        let path_end = ( path_str.len() - 1 ) as isize;
-
-        for p in names {
-            unsafe {
-                if ( p.head != 0 ) && ( *name_ptr != p.head ) {
-                    continue;
-                }
-                if ( p.tail != 0 ) && ( *name_ptr.offset( name_end ) != p.tail ) {
-                    continue;
-                }
-            }
-            if p.pat.matches_with( &name_str, &self.opt ) {
-                return false
-            }
-        }
-
-        for p in paths {
-            unsafe {
-                if ( p.head != 0 ) && ( *path_ptr != p.head ) {
-                    continue;
-                }
-                if ( p.tail != 0 ) && ( *path_ptr.offset( path_end ) != p.tail ) {
-                    continue;
-                }
-            }
-            if p.pat.matches_with( &path_str, &self.opt ) {
-                return false
-            }
-        }
-
-        true
-    }
-
     fn is_ignore_sub ( &self, path: &PathBuf, names: &Vec<IgnoreGitPat>, paths: &Vec<IgnoreGitPat> ) -> bool {
 
         let path_str = path.to_string_lossy();
@@ -293,14 +233,6 @@ impl Ignore for IgnoreGit {
         } else {
             self.is_ignore_sub( path, &self.file_name, &self.file_path )
         }
-    }
-
-    fn check_dir ( &self, path: &PathBuf ) -> bool {
-        self.check( path, &self.dir_name, &self.dir_path )
-    }
-
-    fn check_file( &self, path: &PathBuf ) -> bool {
-        self.check( path, &self.file_name, &self.file_path )
     }
 }
 

@@ -166,7 +166,7 @@ impl PipelineFinder {
         ok_vcs && ok_git
     }
 
-    fn set_default_gitignore( &mut self, base: &PathBuf ) {
+    fn set_default_gitignore( &mut self, _base: &PathBuf ) {
         // TODO 
 
         //if !self.skip_gitignore { return }

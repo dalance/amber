@@ -9,14 +9,15 @@ use time;
 // ---------------------------------------------------------------------------------------------------------------------
 
 pub struct PipelineSorter {
-    pub infos : Vec<String>,
-    pub errors: Vec<String>,
-    map       : HashMap<usize, PathMatch>,
-    seq_no    : usize,
-    join_num  : usize,
-    time_beg  : u64,
-    time_end  : u64,
-    time_bsy  : u64,
+    pub infos  : Vec<String>,
+    pub errors : Vec<String>,
+    pub through: bool,
+    map        : HashMap<usize, PathMatch>,
+    seq_no     : usize,
+    join_num   : usize,
+    time_beg   : u64,
+    time_end   : u64,
+    time_bsy   : u64,
 }
 
 impl PipelineSorter {
@@ -24,6 +25,7 @@ impl PipelineSorter {
         PipelineSorter {
             infos   : Vec::new(),
             errors  : Vec::new(),
+            through : false,
             map     : HashMap::new(),
             seq_no  : 0,
             join_num: num,
@@ -47,17 +49,21 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
                     Ok( PipelineInfo::SeqDat( x, p ) ) => {
                         let beg = time::precise_time_ns();
 
-                        self.map.insert( x, p );
-                        loop {
-                            if !self.map.contains_key( &self.seq_no ) {
-                                break;
+                        if self.through {
+                            let _ = tx.send( PipelineInfo::SeqDat( x, p ) );
+                        } else {
+                            self.map.insert( x, p );
+                            loop {
+                                if !self.map.contains_key( &self.seq_no ) {
+                                    break;
+                                }
+                                {
+                                    let ret = self.map.get( &self.seq_no ).unwrap();
+                                    let _ = tx.send( PipelineInfo::SeqDat( self.seq_no, ret.clone() ) );
+                                }
+                                let _ = self.map.remove( &self.seq_no );
+                                self.seq_no += 1;
                             }
-                            {
-                                let ret = self.map.get( &self.seq_no ).unwrap();
-                                let _ = tx.send( PipelineInfo::SeqDat( self.seq_no, ret.clone() ) );
-                            }
-                            let _ = self.map.remove( &self.seq_no );
-                            self.seq_no += 1;
                         }
 
                         let end = time::precise_time_ns();
@@ -76,7 +82,6 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
                     Ok( PipelineInfo::SeqEnd( x ) ) => {
                         end_num += 1;
                         if end_num != self.join_num { continue; }
-                        //if x != self.seq_no { continue; }
 
                         for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
                         for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }

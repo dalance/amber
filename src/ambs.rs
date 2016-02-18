@@ -41,13 +41,13 @@ Options:
     --binary                   Enable binary file search
     --statistics               Enable statistics output
     --skipped                  Enable skipped file output
-    --no-progress              Disable progress output
     --no-recursive             Disable recursive directory search
     --no-symlink               Disable symbolic link follow
     --no-color                 Disable colored output
     --no-file                  Disable filename output
     --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
     --no-skip-gitignore        Disable .gitignore skip
+    --no-fixed-order           Disable output order guarantee
     -h --help                  Show this message
     -v --version               Show version
 
@@ -62,7 +62,7 @@ static VERSION: &'static str = env!( "CARGO_PKG_VERSION" );
 static BUILD_TIME  : Option<&'static str> = option_env!( "BUILD_TIME"   );
 static GIT_REVISION: Option<&'static str> = option_env!( "GIT_REVISION" );
 
-#[derive(RustcDecodable, Debug, Clone)]
+#[derive(RustcDecodable, Debug)]
 struct Args {
     arg_keyword           : String,
     arg_paths             : Vec<String>,
@@ -76,13 +76,13 @@ struct Args {
     flag_binary           : bool,
     flag_statistics       : bool,
     flag_skipped          : bool,
-    flag_no_progress      : bool,
     flag_no_recursive     : bool,
     flag_no_symlink       : bool,
     flag_no_color         : bool,
     flag_no_file          : bool,
     flag_no_skip_vcs      : bool,
     flag_no_skip_gitignore: bool,
+    flag_no_fixed_order   : bool,
     flag_tbm              : bool,
     flag_sse              : bool,
 }
@@ -145,29 +145,30 @@ fn main() {
     // Pipeline Construct
     // ---------------------------------------------------------------------------------------------
 
-    let id_finder  = 0;
-    let id_sorter  = 1;
-    let id_printer = 2;
-    let id_matcher = 3;
+    let id_finder   = 0;
+    let id_sorter   = 1;
+    let id_printer  = 2;
+    let id_matcher  = 3;
 
     let matcher_num = args.flag_max_threads;
 
-    let ( tx_finder , rx_finder  ) = mpsc::channel();
-    let ( tx_printer, rx_printer ) = mpsc::channel();
-    let ( tx_main   , rx_main    ) = mpsc::channel();
+    let ( tx_finder  , rx_finder   ) = mpsc::channel();
+    let ( tx_printer , rx_printer  ) = mpsc::channel();
+    let ( tx_main    , rx_main     ) = mpsc::channel();
 
     let mut tx_matcher = Vec::new();
     let mut rx_sorter  = Vec::new();
 
-    let mut finder  = PipelineFinder::new();
-    let mut sorter  = PipelineSorter::new( matcher_num );
-    let mut printer = PipelinePrinter::new();
+    let mut finder   = PipelineFinder::new();
+    let mut sorter   = PipelineSorter::new( matcher_num );
+    let mut printer  = PipelinePrinter::new();
 
     finder.is_recursive     = !args.flag_no_recursive;
     finder.follow_symlink   = !args.flag_no_symlink;
     finder.skip_vcs         = !args.flag_no_skip_vcs;
     finder.skip_gitignore   = !args.flag_no_skip_gitignore;
     finder.print_skipped    = args.flag_skipped;
+    sorter.through          = args.flag_no_fixed_order;
     printer.is_color        = !args.flag_no_color;
     printer.print_file      = !args.flag_no_file;
     printer.print_column    = args.flag_column;
@@ -265,9 +266,9 @@ fn main() {
     loop {
         match rx_main.try_recv() {
             Ok ( PipelineInfo::SeqEnd ( _          ) ) => break,
-            Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) if id == id_finder  => { time_finder_bsy  = t0; time_finder_all  = t1; },
-            Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) if id == id_sorter  => { time_sorter_bsy  = t0; time_sorter_all  = t1; },
-            Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) if id == id_printer => { time_printer_bsy = t0; time_printer_all = t1; },
+            Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) if id == id_finder   => { time_finder_bsy   = t0; time_finder_all   = t1; },
+            Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) if id == id_sorter   => { time_sorter_bsy   = t0; time_sorter_all   = t1; },
+            Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) if id == id_printer  => { time_printer_bsy  = t0; time_printer_all  = t1; },
             Ok ( PipelineInfo::MsgTime( id, t0, t1 ) ) => { time_matcher_bsy[id-id_matcher] = t0; time_matcher_all[id-id_matcher] = t1; },
             Ok ( PipelineInfo::MsgInfo( _id, s     ) ) => console.write( ConsoleTextKind::Info , &format!( "{}\n", s ) ),
             Ok ( PipelineInfo::MsgErr ( _id, s     ) ) => console.write( ConsoleTextKind::Error, &format!( "{}\n", s ) ),

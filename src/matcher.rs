@@ -105,7 +105,6 @@ impl Matcher for BruteForceMatcher {
 pub struct QuickSearchMatcher {
     pub max_threads    : usize,
     pub size_per_thread: usize,
-    pub use_sse        : bool ,
 }
 
 impl QuickSearchMatcher {
@@ -113,11 +112,9 @@ impl QuickSearchMatcher {
         QuickSearchMatcher {
             max_threads    : 4,
             size_per_thread: 1024 * 1024,
-            use_sse        : false,
         }
     }
 
-    #[allow(unused_variables)]
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();
@@ -213,7 +210,6 @@ impl Matcher for QuickSearchMatcher {
 pub struct TbmMatcher {
     pub max_threads    : usize,
     pub size_per_thread: usize,
-    pub use_sse        : bool ,
 }
 
 impl TbmMatcher {
@@ -221,11 +217,9 @@ impl TbmMatcher {
         TbmMatcher {
             max_threads    : 4,
             size_per_thread: 1024 * 1024,
-            use_sse        : false,
         }
     }
 
-    #[allow(unused_variables)]
     fn search_sub( &self, src: &[u8], pat: &[u8], qs_table: &[usize;256], md2: usize, beg: usize, end: usize ) -> Vec<Match> {
         let src_len = src.len();
         let pat_len = pat.len();

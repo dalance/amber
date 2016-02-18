@@ -1,5 +1,6 @@
 use console::{Console, ConsoleTextKind};
 use memmap::{Mmap, Protection};
+use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
 use std::fs;
 use std::io;
@@ -7,22 +8,14 @@ use std::io::{Write, Error};
 use std::process;
 use std::sync::mpsc::{Receiver, Sender};
 use time;
-use util::{catch, decode_error, PipelineInfo};
+use util::{catch, decode_error};
 use tempfile::NamedTempFile;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineReplacer
 // ---------------------------------------------------------------------------------------------------------------------
 
-pub trait PipelineReplacer {
-    fn replace( &mut self, replacement: &[u8], rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> );
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// SimplePipelineReplacer
-// ---------------------------------------------------------------------------------------------------------------------
-
-pub struct SimplePipelineReplacer {
+pub struct PipelineReplacer {
     pub is_color      : bool,
     pub is_interactive: bool,
     pub print_file    : bool,
@@ -31,14 +24,15 @@ pub struct SimplePipelineReplacer {
     pub errors        : Vec<String>,
     console           : Console,
     all_replace       : bool,
+    replacement       : Vec<u8>,
     time_beg          : u64,
     time_end          : u64,
     time_bsy          : u64,
 }
 
-impl SimplePipelineReplacer {
-    pub fn new() -> Self {
-        SimplePipelineReplacer {
+impl PipelineReplacer {
+    pub fn new( replacement: &[u8] ) -> Self {
+        PipelineReplacer {
             is_color      : true,
             is_interactive: true,
             print_file    : true,
@@ -47,13 +41,14 @@ impl SimplePipelineReplacer {
             errors        : Vec::new(),
             console       : Console::new(),
             all_replace   : false,
+            replacement   : Vec::from( replacement ),
             time_beg      : 0,
             time_end      : 0,
             time_bsy      : 0,
         }
     }
 
-    fn replace_match( &mut self, replacement: &[u8], pm: PathMatch ) {
+    fn replace_match( &mut self, pm: PathMatch ) {
         if pm.matches.is_empty() { return; }
         self.console.is_color = self.is_color;
 
@@ -92,6 +87,7 @@ impl SimplePipelineReplacer {
 
                         loop {
                             self.console.write( ConsoleTextKind::Other, "Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):" );
+                            self.console.flush();
                             let mut buf = String::new();
                             io::stdin().read_line( &mut buf ).unwrap();
                             match buf.trim().to_lowercase().as_ref() {
@@ -109,7 +105,7 @@ impl SimplePipelineReplacer {
                     }
 
                     if do_replace {
-                        try!( tmpfile.write_all( &replacement ) );
+                        try!( tmpfile.write_all( &self.replacement ) );
                     } else {
                         try!( tmpfile.write_all( &src[m.beg..m.end] ) );
                     }
@@ -136,42 +132,46 @@ impl SimplePipelineReplacer {
     }
 }
 
-impl PipelineReplacer for SimplePipelineReplacer {
-    fn replace( &mut self, replacement: &[u8], rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
+impl Pipeline<PathMatch, ()> for PipelineReplacer {
+    fn setup( &mut self, id: usize, rx: Receiver<PipelineInfo<PathMatch>>, tx: Sender<PipelineInfo<()>> ) {
+        self.infos  = Vec::new();
+        self.errors = Vec::new();
+        let mut seq_beg_arrived = false;
+
         loop {
             match rx.recv() {
-                Ok( PipelineInfo::Ok( pm ) ) => {
+                Ok( PipelineInfo::SeqDat( x, pm ) ) => {
                     let beg = time::precise_time_ns();
 
-                    self.replace_match( replacement, pm );
-                    let _ = tx.send( PipelineInfo::Ok( () ) );
+                    self.replace_match( pm );
+                    let _ = tx.send( PipelineInfo::SeqDat( x, () ) );
 
                     let end = time::precise_time_ns();
                     self.time_bsy += end - beg;
                 },
 
-                Ok( PipelineInfo::Beg( x ) ) => {
-                    self.infos  = Vec::new();
-                    self.errors = Vec::new();
-
-                    self.time_beg = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Beg( x ) );
+                Ok( PipelineInfo::SeqBeg( x ) ) => {
+                    if !seq_beg_arrived {
+                        self.time_beg = time::precise_time_ns();
+                        let _ = tx.send( PipelineInfo::SeqBeg( x ) );
+                        seq_beg_arrived = true;
+                    }
                 },
 
-                Ok( PipelineInfo::End( x ) ) => {
-                    for i in &self.infos  { let _ = tx.send( PipelineInfo::Info( i.clone() ) ); }
-                    for e in &self.errors { let _ = tx.send( PipelineInfo::Err ( e.clone() ) ); }
+                Ok( PipelineInfo::SeqEnd( x ) ) => {
+                    for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
+                    for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
                     self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::Time( self.time_bsy, self.time_end - self.time_beg ) );
-                    let _ = tx.send( PipelineInfo::End( x ) );
+                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::SeqEnd( x ) );
                     break;
                 },
 
-                Ok ( PipelineInfo::Info( e      ) ) => { let _ = tx.send( PipelineInfo::Info( e      ) ); },
-                Ok ( PipelineInfo::Err ( e      ) ) => { let _ = tx.send( PipelineInfo::Err ( e      ) ); },
-                Ok ( PipelineInfo::Time( t0, t1 ) ) => { let _ = tx.send( PipelineInfo::Time( t0, t1 ) ); },
-                Err( _                            ) => break,
+                Ok ( PipelineInfo::MsgInfo( i, e      ) ) => { let _ = tx.send( PipelineInfo::MsgInfo( i, e      ) ); },
+                Ok ( PipelineInfo::MsgErr ( i, e      ) ) => { let _ = tx.send( PipelineInfo::MsgErr ( i, e      ) ); },
+                Ok ( PipelineInfo::MsgTime( i, t0, t1 ) ) => { let _ = tx.send( PipelineInfo::MsgTime( i, t0, t1 ) ); },
+                Err( _                                  ) => break,
             }
         }
     }
