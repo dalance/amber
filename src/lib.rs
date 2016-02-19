@@ -1,5 +1,6 @@
 #![cfg_attr(feature = "sse", feature(asm))]
 
+extern crate ctrlc;
 extern crate docopt;
 extern crate glob;
 extern crate memmap;

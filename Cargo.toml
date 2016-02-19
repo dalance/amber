@@ -20,6 +20,7 @@ path = "src/ambs.rs"
 sse = []
 
 [dependencies]
+ctrlc             = "*"
 docopt            = "0.6.78"
 glob              = "*"
 memmap            = "0.2.3"

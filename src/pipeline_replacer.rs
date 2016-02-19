@@ -1,4 +1,5 @@
 use console::{Console, ConsoleTextKind};
+use ctrlc::CtrlC;
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
@@ -54,6 +55,15 @@ impl PipelineReplacer {
 
         let result = catch::<_, (), Error> ( || {
             let mut tmpfile = try!( NamedTempFile::new_in( pm.path.parent().unwrap_or( &pm.path ) )  );
+
+            let tmpfile_path = tmpfile.path().to_path_buf();
+            CtrlC::set_handler( move || {
+                let path = tmpfile_path.clone();
+                let mut console = Console::new();
+                console.write( ConsoleTextKind::Info, &format!( "\nCleanup temporary file: {:?}\n", path ) );
+                let _ = fs::remove_file( path );
+                process::exit( 0 );
+            } );
 
             {
                 let mmap = try!( Mmap::open_path( &pm.path, Protection::Read ) );
