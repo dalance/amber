@@ -20,43 +20,45 @@ pub struct PathInfo {
 // ---------------------------------------------------------------------------------------------------------------------
 
 pub struct PipelineFinder {
-    pub is_recursive  : bool,
-    pub follow_symlink: bool,
-    pub skip_vcs      : bool,
-    pub skip_gitignore: bool,
-    pub skip_hgignore : bool,
-    pub skip_ambignore: bool,
-    pub print_skipped : bool,
-    pub infos         : Vec<String>,
-    pub errors        : Vec<String>,
-    time_beg          : u64,
-    time_end          : u64,
-    time_bsy          : u64,
-    seq_no            : usize,
-    current_tx        : usize,
-    ignore_vcs        : IgnoreVcs,
-    ignore_git        : Vec<IgnoreGit>,
+    pub is_recursive      : bool,
+    pub follow_symlink    : bool,
+    pub skip_vcs          : bool,
+    pub skip_gitignore    : bool,
+    pub skip_hgignore     : bool,
+    pub skip_ambignore    : bool,
+    pub print_skipped     : bool,
+    pub find_parent_ignore: bool,
+    pub infos             : Vec<String>,
+    pub errors            : Vec<String>,
+    time_beg              : u64,
+    time_end              : u64,
+    time_bsy              : u64,
+    seq_no                : usize,
+    current_tx            : usize,
+    ignore_vcs            : IgnoreVcs,
+    ignore_git            : Vec<IgnoreGit>,
 }
 
 impl PipelineFinder {
     pub fn new() -> Self {
         PipelineFinder {
-            is_recursive  : true,
-            follow_symlink: true,
-            skip_vcs      : true,
-            skip_gitignore: true,
-            skip_hgignore : true,
-            skip_ambignore: true,
-            print_skipped : false,
-            infos         : Vec::new(),
-            errors        : Vec::new(),
-            time_beg      : 0,
-            time_end      : 0,
-            time_bsy      : 0,
-            seq_no        : 0,
-            current_tx    : 0,
-            ignore_vcs    : IgnoreVcs::new(),
-            ignore_git    : Vec::new(),
+            is_recursive      : true,
+            follow_symlink    : true,
+            skip_vcs          : true,
+            skip_gitignore    : true,
+            skip_hgignore     : true,
+            skip_ambignore    : true,
+            print_skipped     : false,
+            find_parent_ignore: true,
+            infos             : Vec::new(),
+            errors            : Vec::new(),
+            time_beg          : 0,
+            time_end          : 0,
+            time_bsy          : 0,
+            seq_no            : 0,
+            current_tx        : 0,
+            ignore_vcs        : IgnoreVcs::new(),
+            ignore_git        : Vec::new(),
         }
     }
 
@@ -166,25 +168,25 @@ impl PipelineFinder {
         ok_vcs && ok_git
     }
 
-    fn set_default_gitignore( &mut self, _base: &PathBuf ) {
-        // TODO 
+    fn set_default_gitignore( &mut self, base: &PathBuf ) -> PathBuf {
+        if !self.skip_gitignore     { return base.clone() }
+        if !self.find_parent_ignore { return base.clone() }
 
-        //if !self.skip_gitignore { return }
+        let base_abs = match base.canonicalize() {
+            Ok ( x ) => x,
+            Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return base.clone(); },
+        };
 
-        //let base_abs = match base.canonicalize() {
-        //    Ok ( x ) => x,
-        //    Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
-        //};
+        let mut parent = base_abs.parent();
+        while parent.is_some() {
+            if self.push_gitignore( &PathBuf::from( parent.unwrap() ) ) {
+                self.infos.push( format!( "Found .gitignore at the parent directory: {:?}\n", parent.unwrap() ) );
+                return base_abs.clone();
+            }
+            parent = parent.unwrap().parent();
+        }
 
-        //let mut parent = base_abs.parent();
-        //println!( "{:?}", parent );
-        //while parent.is_some() {
-        //    if self.push_gitignore( &PathBuf::from( parent.unwrap() ) ) {
-        //        break;
-        //    }
-        //    parent = parent.unwrap().parent();
-        //    println!( "{:?}", parent );
-        //}
+        return base.clone();
     }
 }
 
@@ -199,7 +201,7 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
                 Ok( PipelineInfo::SeqDat( _, p ) ) => {
                     let beg = time::precise_time_ns();
 
-                    self.set_default_gitignore( &p );
+                    let p = self.set_default_gitignore( &p );
                     self.find_path( p, &tx );
 
                     let end = time::precise_time_ns();

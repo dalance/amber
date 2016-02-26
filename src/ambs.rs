@@ -48,6 +48,7 @@ Options:
     --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
     --no-skip-gitignore        Disable .gitignore skip
     --no-fixed-order           Disable output order guarantee
+    --no-parent-ignore         Disable .*ignore file search at parent directories
     -h --help                  Show this message
     -v --version               Show version
 
@@ -83,6 +84,7 @@ struct Args {
     flag_no_skip_vcs      : bool,
     flag_no_skip_gitignore: bool,
     flag_no_fixed_order   : bool,
+    flag_no_parent_ignore : bool,
     flag_tbm              : bool,
     flag_sse              : bool,
 }
@@ -163,15 +165,16 @@ fn main() {
     let mut sorter   = PipelineSorter::new( matcher_num );
     let mut printer  = PipelinePrinter::new();
 
-    finder.is_recursive     = !args.flag_no_recursive;
-    finder.follow_symlink   = !args.flag_no_symlink;
-    finder.skip_vcs         = !args.flag_no_skip_vcs;
-    finder.skip_gitignore   = !args.flag_no_skip_gitignore;
-    finder.print_skipped    = args.flag_skipped;
-    sorter.through          = args.flag_no_fixed_order;
-    printer.is_color        = !args.flag_no_color;
-    printer.print_file      = !args.flag_no_file;
-    printer.print_column    = args.flag_column;
+    finder.is_recursive       = !args.flag_no_recursive;
+    finder.follow_symlink     = !args.flag_no_symlink;
+    finder.skip_vcs           = !args.flag_no_skip_vcs;
+    finder.skip_gitignore     = !args.flag_no_skip_gitignore;
+    finder.print_skipped      = args.flag_skipped;
+    finder.find_parent_ignore = !args.flag_no_parent_ignore;
+    sorter.through            = args.flag_no_fixed_order;
+    printer.is_color          = !args.flag_no_color;
+    printer.print_file        = !args.flag_no_file;
+    printer.print_column      = args.flag_column;
 
     let use_regex          = args.flag_regex          ;
     let use_tbm            = args.flag_tbm            ;
