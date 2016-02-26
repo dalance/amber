@@ -21,6 +21,7 @@ pub struct PipelineReplacer {
     pub is_interactive: bool,
     pub print_file    : bool,
     pub print_column  : bool,
+    pub print_row     : bool,
     pub infos         : Vec<String>,
     pub errors        : Vec<String>,
     console           : Console,
@@ -37,7 +38,8 @@ impl PipelineReplacer {
             is_color      : true,
             is_interactive: true,
             print_file    : true,
-            print_column  : true,
+            print_column  : false,
+            print_row     : false,
             infos         : Vec::new(),
             errors        : Vec::new(),
             console       : Console::new(),
@@ -82,7 +84,7 @@ impl PipelineReplacer {
                             self.console.write( ConsoleTextKind::Filename, pm.path.to_str().unwrap() );
                             self.console.write( ConsoleTextKind::Other, ": " );
                         }
-                        if self.print_column {
+                        if self.print_column | self.print_row {
                             while pos < m.beg {
                                 if src[pos] == 0x0a {
                                     column += 1;
@@ -90,7 +92,12 @@ impl PipelineReplacer {
                                 }
                                 pos += 1;
                             }
-                            self.console.write( ConsoleTextKind::Other, &format!( "{}:{}:", column + 1, m.beg - last_lf ) );
+                            if self.print_column {
+                                self.console.write( ConsoleTextKind::Other, &format!( "{}:", column + 1 ) );
+                            }
+                            if self.print_row {
+                                self.console.write( ConsoleTextKind::Other, &format!( "{}:", m.beg - last_lf ) );
+                            }
                         }
 
                         self.console.write_match_line( src, m );

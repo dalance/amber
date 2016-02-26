@@ -39,6 +39,7 @@ Options:
     --bin-check-bytes <bytes>  Read size by byte for checking binary [default: 256]
     --regex                    Enable regular expression search
     --column                   Enable column output
+    --row                      Enable row output
     --binary                   Enable binary file search
     --statistics               Enable statistics output
     --skipped                  Enable skipped file output
@@ -78,6 +79,7 @@ struct Args {
     flag_mmap_bytes       : u64,
     flag_regex            : bool,
     flag_column           : bool,
+    flag_row              : bool,
     flag_binary           : bool,
     flag_statistics       : bool,
     flag_skipped          : bool,
@@ -194,6 +196,7 @@ fn main() {
     replacer.is_interactive   = !args.flag_no_interactive;
     replacer.print_file       = !args.flag_no_file;
     replacer.print_column     = args.flag_column;
+    replacer.print_row        = args.flag_row;
 
     let use_regex          = args.flag_regex          ;
     let use_tbm            = args.flag_tbm            ;

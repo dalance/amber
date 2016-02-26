@@ -15,6 +15,7 @@ pub struct PipelinePrinter {
     pub is_color    : bool,
     pub print_file  : bool,
     pub print_column: bool,
+    pub print_row   : bool,
     pub infos       : Vec<String>,
     pub errors      : Vec<String>,
     console         : Console,
@@ -29,6 +30,7 @@ impl PipelinePrinter {
             is_color    : true,
             print_file  : true,
             print_column: false,
+            print_row   : false,
             infos       : Vec::new(),
             errors      : Vec::new(),
             console     : Console::new(),
@@ -54,7 +56,7 @@ impl PipelinePrinter {
                     self.console.write( ConsoleTextKind::Filename, pm.path.to_str().unwrap() );
                     self.console.write( ConsoleTextKind::Filename, ":" );
                 }
-                if self.print_column {
+                if self.print_column | self.print_row {
                     while pos < m.beg {
                         if src[pos] == 0x0a {
                             column += 1;
@@ -62,7 +64,12 @@ impl PipelinePrinter {
                         }
                         pos += 1;
                     }
-                    self.console.write( ConsoleTextKind::Other, &format!( "{}:{}:", column + 1, m.beg - last_lf ) );
+                    if self.print_column {
+                        self.console.write( ConsoleTextKind::Other, &format!( "{}:", column + 1 ) );
+                    }
+                    if self.print_row {
+                        self.console.write( ConsoleTextKind::Other, &format!( "{}:", m.beg - last_lf ) );
+                    }
                 }
 
                 self.console.write_match_line( src, m );
