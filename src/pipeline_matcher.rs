@@ -178,14 +178,11 @@ mod tests {
         let _ = in_tx.send( PipelineInfo::SeqEnd( 3                                                             ) );
 
         let mut ret = Vec::new();
-        let mut time_bsy = 0;
-        let mut time_all = 0;
         loop {
             match out_rx.recv().unwrap() {
-                PipelineInfo::SeqDat ( _, x      ) => ret.push( x ),
-                PipelineInfo::SeqEnd ( _         ) => break,
-                PipelineInfo::MsgTime( _, t0, t1 ) => { time_bsy = t0; time_all = t1; },
-                _                                  => (),
+                PipelineInfo::SeqDat ( _, x ) => ret.push( x ),
+                PipelineInfo::SeqEnd ( _    ) => break,
+                _                             => (),
             }
         }
 
@@ -194,10 +191,6 @@ mod tests {
             if r.path == PathBuf::from( "./src/ambr.rs" ) { assert!( !r.matches.is_empty() ); }
             if r.path == PathBuf::from( "./src/util.rs" ) { assert!(  r.matches.is_empty() ); }
         }
-
-        assert!( time_bsy != 0 );
-        assert!( time_all != 0 );
-        assert!( time_bsy < time_all );
     }
 }
 

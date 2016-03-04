@@ -129,24 +129,17 @@ mod tests {
         let _ = in_tx.send( PipelineInfo::SeqEnd( 3                                                                ) );
 
         let mut ret = Vec::new();
-        let mut time_bsy = 0;
-        let mut time_all = 0;
         loop {
             match out_rx.recv().unwrap() {
-                PipelineInfo::SeqDat ( x, _      ) => ret.push( x ),
-                PipelineInfo::SeqEnd ( _         ) => break,
-                PipelineInfo::MsgTime( _, t0, t1 ) => { time_bsy = t0; time_all = t1; },
-                _                                  => (),
+                PipelineInfo::SeqDat ( x, _ ) => ret.push( x ),
+                PipelineInfo::SeqEnd ( _    ) => break,
+                _                             => (),
             }
         }
 
         assert_eq!( ret[0], 0 );
         assert_eq!( ret[1], 1 );
         assert_eq!( ret[2], 2 );
-
-        assert!( time_bsy != 0 );
-        assert!( time_all != 0 );
-        assert!( time_bsy < time_all );
     }
 }
 
