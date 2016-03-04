@@ -9,10 +9,10 @@ environment:
     RUST_INSTALL_DIR: C:\Rust
     matrix:
         - RUST_INSTALL_TRIPLE: i686-pc-windows-msvc
-          RUST_VERSION: 1.6.0
+          RUST_VERSION: 1.7.0
           ARCH: i686
         - RUST_INSTALL_TRIPLE: x86_64-pc-windows-msvc
-          RUST_VERSION: 1.6.0
+          RUST_VERSION: 1.7.0
           ARCH: x86_64
 
 install:
