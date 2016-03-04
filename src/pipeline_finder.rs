@@ -199,13 +199,10 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
         loop {
             match rx.recv() {
                 Ok( PipelineInfo::SeqDat( _, p ) ) => {
-                    let beg = time::precise_time_ns();
-
-                    let p = self.set_default_gitignore( &p );
-                    self.find_path( p, &tx );
-
-                    let end = time::precise_time_ns();
-                    self.time_bsy += end - beg;
+                    watch_time!( self.time_bsy, {
+                        let p = self.set_default_gitignore( &p );
+                        self.find_path( p, &tx );
+                    } );
                 },
 
                 Ok( PipelineInfo::SeqBeg( x ) ) => {

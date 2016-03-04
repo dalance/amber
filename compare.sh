@@ -1,12 +1,10 @@
 #!/bin/zsh
 
-cnt=10
-out="result.txt"
+cnt=9
+out="result.csv"
 
 #prgs=(grep ack ag pt hw sift ambs)
-prgs=(grep ag pt hw sift ambs_20160208_dcef98d ambs_20160212_47fada7 ambs_20160215_988ba02 ambs_20160217_365746a ambs_20160218_8979031 ambs_20160219_9fec428)
-
-time="TIME=%U,%S,%e,%P,%M,%F,%R,%w,%I,%O /usr/bin/time"
+prgs=(ambs)
 
 opt_grep="--binary-files=without-match --color=auto -r"
 opt_ack="--nogroup"
@@ -14,67 +12,47 @@ opt_ag="--nogroup"
 opt_pt="--nogroup"
 opt_hw="--no-group"
 opt_sift=""
-opt_ambs=""
+opt_ambs="--no-parent-ignore"
 
-echo "" > $out
+echo -n "" > $out
 
 for p in $prgs; do
     eval `echo "$p --version >> $out"`
 done
 
-echo "bench,prg,user time[s],sys time[s],total time[s],cpu usage[%],mem usage[kB],major page fault,minor page fault,wait,in,out" >> $out
+dir_info() {
+    echo $1 >> $out
+    du -sh $1 >> $out
+    find $1 -type f | wc -l >> $out
+}
 
-name="many files and many matches"
-for p in $prgs; do
-    for i in {0..$cnt}; do
+time_avg() {
+    eval `echo "( TIME=%e /usr/bin/time grep -r $2 $3 | wc -l ) >> $out"`;
+    for p in $prgs; do
+        echo -n "" > tmp
         opt=`eval echo '$opt_'$p`;
-        echo -n $name,$p, >> $out
-        eval `echo "( $time $p $opt EXPORT_SYMBOL_GPL ./data/linux ) 2>> $out"`;
-    done;
-done
+        eval `echo "( TIME=%e /usr/bin/time $p $opt $2 $3 )"`;
+        for i in {0..$cnt}; do
+            eval `echo "( TIME=%e /usr/bin/time $p $opt $2 $3 ) 2>> tmp"`;
+        done;
+        echo -n $1,$p, >> $out
+        awk '{sum+=$1}END{print sum/NR}' tmp >> $out
+    done
+}
 
-name="many files and few matches"
-for p in $prgs; do
-    for i in {0..$cnt}; do
-        opt=`eval echo '$opt_'$p`;
-        echo -n $name,$p, >> $out
-        eval `echo "( $time $p $opt irq_bypass_register_producer ./data/linux ) 2>> $out"`;
-    done;
-done
+dir_info "./data/linux"
+dir_info "./data/linux_build"
+dir_info "./data/jawiki-latest-pages-articles.xml"
+dir_info "./data/llvm"
+dir_info "./data/jawiki-latest-abstract1.xml"
 
-name="many files and many matches with binary"
-for p in $prgs; do
-    for i in {0..$cnt}; do
-        opt=`eval echo '$opt_'$p`;
-        echo -n $name,$p, >> $out
-        eval `echo "( $time $p $opt EXPORT_SYMBOL_GPL ./data/linux_build ) 2>> $out"`;
-    done;
-done
-
-name="many files and few matches with binary"
-for p in $prgs; do
-    for i in {0..$cnt}; do
-        opt=`eval echo '$opt_'$p`;
-        echo -n $name,$p, >> $out
-        eval `echo "( $time $p $opt irq_bypass_register_producer ./data/linux_build ) 2>> $out"`;
-    done;
-done
-
-name="large file and many matches"
-for p in $prgs; do
-    for i in {0..$cnt}; do
-        opt=`eval echo '$opt_'$p`;
-        echo -n $name,$p, >> $out
-        eval `echo "( $time $p $opt 検索結果 ./data/jawiki-latest-pages-articles.xml ) 2>> $out"`;
-    done;
-done
-
-name="large file and few matches"
-for p in $prgs; do
-    for i in {0..$cnt}; do
-        opt=`eval echo '$opt_'$p`;
-        echo -n $name,$p, >> $out
-        eval `echo "( $time $p $opt \"Quick Search\" ./data/jawiki-latest-pages-articles.xml ) 2>> $out"`;
-    done;
-done
-
+time_avg "many files / many hits"             "EXPORT_SYMBOL_GPL"            "./data/linux"
+time_avg "many files / few hits"              "irq_bypass_register_producer" "./data/linux"
+time_avg "many files / many hits with binary" "EXPORT_SYMBOL_GPL"            "./data/linux_build"
+time_avg "many files / few hits with binary"  "irq_bypass_register_producer" "./data/linux_build"
+time_avg "a large file / many hits"           "検索結果"                     "./data/jawiki-latest-pages-articles.xml"
+time_avg "a large file / few hits"            "\"Quick Search\""             "./data/jawiki-latest-pages-articles.xml"
+#time_avg "many files / many hits"             "i686"                         "./data/llvm"
+#time_avg "many files / few hits"              "arm_neon_sha1"                "./data/llvm"
+#time_avg "a large file / many hits"           "検索結果"                     "./data/jawiki-latest-abstract1.xml"
+#time_avg "a large file / few hits"            "Rust"                         "./data/jawiki-latest-abstract1.xml"

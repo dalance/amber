@@ -47,27 +47,24 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
             for rx in &rx {
                 match rx.recv() {
                     Ok( PipelineInfo::SeqDat( x, p ) ) => {
-                        let beg = time::precise_time_ns();
-
-                        if self.through {
-                            let _ = tx.send( PipelineInfo::SeqDat( x, p ) );
-                        } else {
-                            self.map.insert( x, p );
-                            loop {
-                                if !self.map.contains_key( &self.seq_no ) {
-                                    break;
+                        watch_time!( self.time_bsy, {
+                            if self.through {
+                                let _ = tx.send( PipelineInfo::SeqDat( x, p ) );
+                            } else {
+                                self.map.insert( x, p );
+                                loop {
+                                    if !self.map.contains_key( &self.seq_no ) {
+                                        break;
+                                    }
+                                    {
+                                        let ret = self.map.get( &self.seq_no ).unwrap();
+                                        let _ = tx.send( PipelineInfo::SeqDat( self.seq_no, ret.clone() ) );
+                                    }
+                                    let _ = self.map.remove( &self.seq_no );
+                                    self.seq_no += 1;
                                 }
-                                {
-                                    let ret = self.map.get( &self.seq_no ).unwrap();
-                                    let _ = tx.send( PipelineInfo::SeqDat( self.seq_no, ret.clone() ) );
-                                }
-                                let _ = self.map.remove( &self.seq_no );
-                                self.seq_no += 1;
                             }
-                        }
-
-                        let end = time::precise_time_ns();
-                        self.time_bsy += end - beg;
+                        } );
                     },
 
                     Ok( PipelineInfo::SeqBeg( x ) ) => {

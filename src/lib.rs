@@ -14,6 +14,8 @@ extern crate time;
 extern crate tempfile;
 extern crate term;
 
+#[macro_use]
+pub mod util;
 pub mod console;
 pub mod ignore;
 pub mod matcher;
@@ -23,4 +25,3 @@ pub mod pipeline_matcher;
 pub mod pipeline_sorter;
 pub mod pipeline_printer;
 pub mod pipeline_replacer;
-pub mod util;

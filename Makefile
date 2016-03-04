@@ -19,6 +19,9 @@ bench:
 bench_sse:
 	cargo bench --features 'sse'
 
+build_statistics:
+	cargo build --release --features 'statistics'
+
 clean:
 	cargo clean
 

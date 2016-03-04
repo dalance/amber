@@ -111,13 +111,10 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
         loop {
             match rx.recv() {
                 Ok( PipelineInfo::SeqDat( x, p ) ) => {
-                    let beg = time::precise_time_ns();
-
-                    let ret = self.search_path( p );
-                    let _ = tx.send( PipelineInfo::SeqDat( x, ret ) );
-
-                    let end = time::precise_time_ns();
-                    self.time_bsy += end - beg;
+                    watch_time!( self.time_bsy, {
+                        let ret = self.search_path( p );
+                        let _ = tx.send( PipelineInfo::SeqDat( x, ret ) );
+                    } );
                 },
 
                 Ok( PipelineInfo::SeqBeg( x ) ) => {

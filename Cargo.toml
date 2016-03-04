@@ -18,6 +18,7 @@ path = "src/ambs.rs"
 
 [features]
 sse = []
+statistics = []
 
 [dependencies]
 ctrlc             = "*"

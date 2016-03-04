@@ -93,13 +93,10 @@ impl Pipeline<PathMatch, ()> for PipelinePrinter {
         loop {
             match rx.recv() {
                 Ok( PipelineInfo::SeqDat( x, pm ) ) => {
-                    let beg = time::precise_time_ns();
-
-                    self.print_match( pm );
-                    let _ = tx.send( PipelineInfo::SeqDat( x, () ) );
-
-                    let end = time::precise_time_ns();
-                    self.time_bsy += end - beg;
+                    watch_time!( self.time_bsy, {
+                        self.print_match( pm );
+                        let _ = tx.send( PipelineInfo::SeqDat( x, () ) );
+                    } );
                 },
 
                 Ok( PipelineInfo::SeqBeg( x ) ) => {

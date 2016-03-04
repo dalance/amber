@@ -7,6 +7,27 @@ use std::io::{BufReader, Read, Error, ErrorKind};
 // Utility
 // ---------------------------------------------------------------------------------------------------------------------
 
+#[cfg(feature = "statistics")]
+macro_rules! watch_time (
+    ( $total:expr, $func:block ) => (
+        {
+            let beg = time::precise_time_ns();
+            $func;
+            let end = time::precise_time_ns();
+            $total += end - beg;
+        }
+    );
+);
+
+#[cfg(not(feature = "statistics"))]
+macro_rules! watch_time (
+    ( $total:expr, $func:block ) => (
+        {
+            $func;
+        }
+    );
+);
+
 pub fn watch_time<F>( closure: F ) -> u64 where F: FnOnce() -> () {
     let start = time::precise_time_ns();
     closure();

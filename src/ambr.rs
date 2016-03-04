@@ -328,8 +328,8 @@ fn main() {
         for i in 0..matcher_num {
         console.write( ConsoleTextKind::Info, &format!( "    Match{:02}  : {}s / {}s\n"  , i, sec_matcher_bsy[i], sec_matcher_all[i] ) );
         }
-        console.write( ConsoleTextKind::Info, &format!( "    Sort     : {}s / {}s\n\n", sec_sorter_bsy  , sec_sorter_all   ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Replace  : {}s / {}s\n"  , sec_replacer_bsy, sec_replacer_all ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Sort     : {}s / {}s\n"  , sec_sorter_bsy  , sec_sorter_all   ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Replace  : {}s / {}s\n\n", sec_replacer_bsy, sec_replacer_all ) );
         console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
         console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );

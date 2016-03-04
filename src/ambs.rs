@@ -309,7 +309,7 @@ fn main() {
         for i in 0..matcher_num {
         console.write( ConsoleTextKind::Info, &format!( "    Match{:02}  : {}s / {}s\n"  , i, sec_matcher_bsy[i], sec_matcher_all[i] ) );
         }
-        console.write( ConsoleTextKind::Info, &format!( "    Sort     : {}s / {}s\n\n", sec_sorter_bsy  , sec_sorter_all   ) );
+        console.write( ConsoleTextKind::Info, &format!( "    Sort     : {}s / {}s\n"  , sec_sorter_bsy  , sec_sorter_all   ) );
         console.write( ConsoleTextKind::Info, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
         console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
         console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
