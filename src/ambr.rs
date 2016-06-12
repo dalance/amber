@@ -10,13 +10,14 @@ use amber::pipeline_finder::PipelineFinder;
 use amber::pipeline_matcher::PipelineMatcher;
 use amber::pipeline_sorter::PipelineSorter;
 use amber::pipeline_replacer::PipelineReplacer;
-use amber::util::{decode_error, read_from_file};
+use amber::util::{decode_error, read_from_file, as_secsf64};
 use docopt::Docopt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Usage
@@ -271,18 +272,18 @@ fn main() {
     }
     let _ = tx_finder.send( PipelineInfo::SeqEnd( seq_no ) );
 
-    let mut time_finder_bsy   = 0;
-    let mut time_finder_all   = 0;
-    let mut time_sorter_bsy   = 0;
-    let mut time_sorter_all   = 0;
-    let mut time_replacer_bsy = 0;
-    let mut time_replacer_all = 0;
+    let mut time_finder_bsy   = Duration::new(0, 0);
+    let mut time_finder_all   = Duration::new(0, 0);
+    let mut time_sorter_bsy   = Duration::new(0, 0);
+    let mut time_sorter_all   = Duration::new(0, 0);
+    let mut time_replacer_bsy = Duration::new(0, 0);
+    let mut time_replacer_all = Duration::new(0, 0);
 
     let mut time_matcher_bsy = Vec::new();
     let mut time_matcher_all = Vec::new();
     for _ in 0..matcher_num {
-        time_matcher_bsy.push( 0 );
-        time_matcher_all.push( 0 );
+        time_matcher_bsy.push( Duration::new(0, 0) );
+        time_matcher_all.push( Duration::new(0, 0) );
     }
 
     let mut count_finder  = 0;
@@ -306,18 +307,18 @@ fn main() {
     // Pipeline Flow
     // ---------------------------------------------------------------------------------------------
 
-    let sec_finder_bsy   = time_finder_bsy   as f64 / 1000000000.0;
-    let sec_finder_all   = time_finder_all   as f64 / 1000000000.0;
-    let sec_sorter_bsy   = time_sorter_bsy   as f64 / 1000000000.0;
-    let sec_sorter_all   = time_sorter_all   as f64 / 1000000000.0;
-    let sec_replacer_bsy = time_replacer_bsy as f64 / 1000000000.0;
-    let sec_replacer_all = time_replacer_all as f64 / 1000000000.0;
+    let sec_finder_bsy   = as_secsf64(time_finder_bsy);
+    let sec_finder_all   = as_secsf64(time_finder_all);
+    let sec_sorter_bsy   = as_secsf64(time_sorter_bsy);
+    let sec_sorter_all   = as_secsf64(time_sorter_all);
+    let sec_replacer_bsy = as_secsf64(time_replacer_bsy);
+    let sec_replacer_all = as_secsf64(time_replacer_all);
 
     let mut sec_matcher_bsy = Vec::new();
     let mut sec_matcher_all = Vec::new();
     for i in 0..matcher_num {
-        sec_matcher_bsy.push( time_matcher_bsy[i] as f64 / 1000000000.0 );
-        sec_matcher_all.push( time_matcher_all[i] as f64 / 1000000000.0 );
+        sec_matcher_bsy.push( as_secsf64(time_matcher_bsy[i]) );
+        sec_matcher_all.push( as_secsf64(time_matcher_all[i]) );
     }
 
     if args.flag_statistics {

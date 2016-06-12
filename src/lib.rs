@@ -10,7 +10,6 @@ extern crate regex;
 extern crate rlibc;
 extern crate rustc_serialize;
 extern crate scoped_threadpool;
-extern crate time;
 extern crate tempfile;
 extern crate term;
 

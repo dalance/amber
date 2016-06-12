@@ -4,7 +4,7 @@ use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
 use std::io::Error;
 use std::sync::mpsc::{Receiver, Sender};
-use time;
+use std::time::{Duration, Instant};
 use util::{catch, decode_error};
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -19,9 +19,8 @@ pub struct PipelinePrinter {
     pub infos       : Vec<String>,
     pub errors      : Vec<String>,
     console         : Console,
-    time_beg        : u64,
-    time_end        : u64,
-    time_bsy        : u64,
+    time_beg        : Instant,
+    time_bsy        : Duration,
 }
 
 impl PipelinePrinter {
@@ -34,9 +33,8 @@ impl PipelinePrinter {
             infos       : Vec::new(),
             errors      : Vec::new(),
             console     : Console::new(),
-            time_beg    : 0,
-            time_end    : 0,
-            time_bsy    : 0,
+            time_beg    : Instant::now(),
+            time_bsy    : Duration::new(0, 0),
         }
     }
 
@@ -101,7 +99,7 @@ impl Pipeline<PathMatch, ()> for PipelinePrinter {
 
                 Ok( PipelineInfo::SeqBeg( x ) ) => {
                     if !seq_beg_arrived {
-                        self.time_beg = time::precise_time_ns();
+                        self.time_beg = Instant::now();
                         let _ = tx.send( PipelineInfo::SeqBeg( x ) );
                         seq_beg_arrived = true;
                     }
@@ -111,8 +109,7 @@ impl Pipeline<PathMatch, ()> for PipelinePrinter {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
-                    self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_beg.elapsed() ) );
                     let _ = tx.send( PipelineInfo::SeqEnd( x ) );
                     break;
                 },

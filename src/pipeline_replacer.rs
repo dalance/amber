@@ -1,5 +1,5 @@
 use console::{Console, ConsoleTextKind};
-use ctrlc::CtrlC;
+use ctrlc;
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
@@ -8,7 +8,7 @@ use std::io;
 use std::io::{Write, Error};
 use std::process;
 use std::sync::mpsc::{Receiver, Sender};
-use time;
+use std::time::{Duration, Instant};
 use util::{catch, decode_error};
 use tempfile::NamedTempFile;
 
@@ -27,9 +27,8 @@ pub struct PipelineReplacer {
     console           : Console,
     all_replace       : bool,
     replacement       : Vec<u8>,
-    time_beg          : u64,
-    time_end          : u64,
-    time_bsy          : u64,
+    time_beg          : Instant,
+    time_bsy          : Duration,
 }
 
 impl PipelineReplacer {
@@ -45,9 +44,8 @@ impl PipelineReplacer {
             console       : Console::new(),
             all_replace   : false,
             replacement   : Vec::from( replacement ),
-            time_beg      : 0,
-            time_end      : 0,
-            time_bsy      : 0,
+            time_beg      : Instant::now(),
+            time_bsy      : Duration::new(0, 0),
         }
     }
 
@@ -59,7 +57,7 @@ impl PipelineReplacer {
             let mut tmpfile = try!( NamedTempFile::new_in( pm.path.parent().unwrap_or( &pm.path ) )  );
 
             let tmpfile_path = tmpfile.path().to_path_buf();
-            CtrlC::set_handler( move || {
+            ctrlc::set_handler( move || {
                 let path = tmpfile_path.clone();
                 let mut console = Console::new();
                 console.write( ConsoleTextKind::Info, &format!( "\nCleanup temporary file: {:?}\n", path ) );
@@ -166,7 +164,7 @@ impl Pipeline<PathMatch, ()> for PipelineReplacer {
 
                 Ok( PipelineInfo::SeqBeg( x ) ) => {
                     if !seq_beg_arrived {
-                        self.time_beg = time::precise_time_ns();
+                        self.time_beg = Instant::now();
                         let _ = tx.send( PipelineInfo::SeqBeg( x ) );
                         seq_beg_arrived = true;
                     }
@@ -176,8 +174,7 @@ impl Pipeline<PathMatch, ()> for PipelineReplacer {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
-                    self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_beg.elapsed() ) );
                     let _ = tx.send( PipelineInfo::SeqEnd( x ) );
                     break;
                 },

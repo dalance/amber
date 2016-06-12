@@ -1,6 +1,6 @@
 [package]
 name = "amber"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["dalance@gmail.com"]
 repository = "https://github.com/dalance/amber"
 keywords = ["search", "replace"]
@@ -21,14 +21,14 @@ sse = []
 statistics = []
 
 [dependencies]
-ctrlc             = "*"
+ctrlc             = "2.0.0"
 docopt            = "0.6.78"
-glob              = "*"
+glob              = "0.2.11"
 memmap            = "0.2.3"
 num_cpus          = "0.2.10"
 regex             = "0.1.47"
 rand              = "0.3.13"
-rlibc             = "*"
+rlibc             = "1.0.0"
 rustc-serialize   = "0.3.16"
 scoped_threadpool = "0.1.6"
 tempfile          = "2.0.1"
