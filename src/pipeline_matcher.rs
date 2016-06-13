@@ -6,7 +6,7 @@ use std::io::{Error, Read};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
-use time;
+use std::time::{Duration, Instant};
 use util::{catch, decode_error};
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -30,9 +30,8 @@ pub struct PipelineMatcher<T: Matcher> {
     pub mmap_bytes        : u64,
     pub infos             : Vec<String>,
     pub errors            : Vec<String>,
-    time_beg              : u64,
-    time_end              : u64,
-    time_bsy              : u64,
+    time_beg              : Instant,
+    time_bsy              : Duration,
     matcher               : T,
     keyword               : Vec<u8>,
 }
@@ -46,9 +45,8 @@ impl<T: Matcher> PipelineMatcher<T> {
             mmap_bytes        : 1024 * 1024,
             infos             : Vec::new(),
             errors            : Vec::new(),
-            time_beg          : 0,
-            time_end          : 0,
-            time_bsy          : 0,
+            time_beg          : Instant::now(),
+            time_bsy          : Duration::new(0, 0),
             matcher           : matcher,
             keyword           : Vec::from( keyword ),
         }
@@ -119,7 +117,7 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
 
                 Ok( PipelineInfo::SeqBeg( x ) ) => {
                     if !seq_beg_arrived {
-                        self.time_beg = time::precise_time_ns();
+                        self.time_beg = Instant::now();
                         let _ = tx.send( PipelineInfo::SeqBeg( x ) );
                         seq_beg_arrived = true;
                     }
@@ -129,9 +127,7 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
                     for i in &self.infos  { let _ = tx.send( PipelineInfo::MsgInfo( id, i.clone() ) ); }
                     for e in &self.errors { let _ = tx.send( PipelineInfo::MsgErr ( id, e.clone() ) ); }
 
-                    //println!( "{} {} {}", id, self.time_bsy, self.time_end - self.time_beg );
-                    self.time_end = time::precise_time_ns();
-                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_end - self.time_beg ) );
+                    let _ = tx.send( PipelineInfo::MsgTime( id, self.time_bsy, self.time_beg.elapsed() ) );
                     let _ = tx.send( PipelineInfo::SeqEnd( x ) );
                     break;
                 },

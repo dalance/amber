@@ -1,4 +1,5 @@
 use std::sync::mpsc::{Receiver, Sender};
+use std::time::Duration;
 
 pub enum PipelineInfo<T> {
     SeqBeg ( usize           ),
@@ -6,7 +7,7 @@ pub enum PipelineInfo<T> {
     SeqEnd ( usize           ),
     MsgInfo( usize, String   ),
     MsgErr ( usize, String   ),
-    MsgTime( usize, u64, u64 ),
+    MsgTime( usize, Duration, Duration ),
 }
 
 pub trait Pipeline<T,U> {

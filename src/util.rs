@@ -1,7 +1,6 @@
-extern crate time;
-
 use std::fs::File;
 use std::io::{BufReader, Read, Error, ErrorKind};
+use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Utility
@@ -11,10 +10,9 @@ use std::io::{BufReader, Read, Error, ErrorKind};
 macro_rules! watch_time (
     ( $total:expr, $func:block ) => (
         {
-            let beg = time::precise_time_ns();
+            let beg = Instant::now();
             $func;
-            let end = time::precise_time_ns();
-            $total += end - beg;
+            $total += beg.elapsed();
         }
     );
 );
@@ -28,15 +26,18 @@ macro_rules! watch_time (
     );
 );
 
-pub fn watch_time<F>( closure: F ) -> u64 where F: FnOnce() -> () {
-    let start = time::precise_time_ns();
+pub fn watch_time<F>( closure: F ) -> Duration where F: FnOnce() -> () {
+    let start = Instant::now();
     closure();
-    let end = time::precise_time_ns();
-    end - start
+    start.elapsed()
 }
 
 pub fn catch<F, T, E>( closure: F ) -> Result<T, E> where F: FnOnce() -> Result<T, E> {
     closure()
+}
+
+pub fn as_secsf64( dur: Duration ) -> f64 {
+    (dur.as_secs() as f64) + (dur.subsec_nanos() as f64 / 1000_000_000.0)
 }
 
 pub fn read_from_file( path: &str ) -> Result<Vec<u8>, Error> {
@@ -74,10 +75,10 @@ pub fn decode_error( e: ErrorKind ) -> &'static str {
 }
 
 pub enum PipelineInfo<T> {
-    Beg ( usize    ),
-    Ok  ( T        ),
-    Info( String   ),
-    Err ( String   ),
-    Time( u64, u64 ),
-    End ( usize    ),
+    Beg ( usize  ),
+    Ok  ( T      ),
+    Info( String ),
+    Err ( String ),
+    Time( Duration, Duration ),
+    End ( usize  ),
 }
