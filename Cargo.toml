@@ -4,9 +4,13 @@ version = "0.3.0"
 authors = ["dalance@gmail.com"]
 repository = "https://github.com/dalance/amber"
 keywords = ["search", "replace"]
+categories = ["command-line-utilities"]
 license = "MIT"
 readme = "README.md"
 description = "A code search and replace tool"
+
+[badges]
+travis-ci = { repository = "dalance/amber" }
 
 [[bin]]
 name = "ambr"
