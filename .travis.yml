@@ -4,26 +4,35 @@ os:
   - linux
   - osx
 
+env:
+- ARCH=i686
+- ARCH=x86_64
+
 rust: stable
 
 before_install:
-    - if [[ $TRAVIS_OS_NAME == "linux" ]]; then sudo apt-get -qq update; fi
-    - if [[ $TRAVIS_OS_NAME == "linux" ]]; then sudo apt-get install -y gcc-multilib g++-multilib; fi
+- if [[ $TRAVIS_OS_NAME == "linux" ]]; then sudo apt-get -qq update; fi
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "i686"   ]]; then sudo apt-get install -y gcc-multilib g++-multilib; fi
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "x86_64" ]]; then sudo apt-get install -y gcc-multilib g++-multilib; fi
 
 before_script:
-  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then curl -O https://static.rust-lang.org/dist/rust-std-1.9.0-i686-apple-darwin.tar.gz; fi
-  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then tar xf rust-std-1.9.0-i686-apple-darwin.tar.gz; fi
-  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then mv rust-std-1.9.0-i686-apple-darwin/rust-std-i686-apple-darwin/lib/rustlib/i686-apple-darwin ~/rust/lib/rustlib/; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then curl -O https://static.rust-lang.org/dist/rust-std-1.9.0-i686-unknown-linux-gnu.tar.gz; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then tar xf rust-std-1.9.0-i686-unknown-linux-gnu.tar.gz; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then mv rust-std-1.9.0-i686-unknown-linux-gnu/rust-std-i686-unknown-linux-gnu/lib/rustlib/i686-unknown-linux-gnu ~/rust/lib/rustlib/; fi
+- curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain beta
+- export PATH=~/.cargo/bin:$PATH
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "x86_64" ]]; then rustup target add x86_64-unknown-linux-musl; fi
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "i686"   ]]; then rustup target add i686-unknown-linux-gnu; fi
+- if [[ $TRAVIS_OS_NAME == "osx"   && $ARCH == "i686"   ]]; then rustup target add i686-apple-darwin; fi
+- which cargo
+- which rustc
+- cargo --version
+- rustc --version
 
 script:
-  - make test
-  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx32; fi
-  - if [[ $TRAVIS_OS_NAME == "osx"   ]]; then make release_osx64; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx32; fi
-  - if [[ $TRAVIS_OS_NAME == "linux" ]]; then make release_lnx64; fi
+- if [[ $TRAVIS_OS_NAME == "osx"   && $ARCH == "x86_64" ]]; then make test; fi
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "x86_64" ]]; then make test; fi
+- if [[ $TRAVIS_OS_NAME == "osx"   && $ARCH == "i686"   ]]; then make release_osx32; fi
+- if [[ $TRAVIS_OS_NAME == "osx"   && $ARCH == "x86_64" ]]; then make release_osx64; fi
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "i686"   ]]; then make release_lnx32; fi
+- if [[ $TRAVIS_OS_NAME == "linux" && $ARCH == "x86_64" ]]; then make release_lnx64; fi
 
 deploy:
   provider: releases

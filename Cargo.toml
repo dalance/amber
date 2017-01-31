@@ -11,6 +11,7 @@ description = "A code search and replace tool"
 
 [badges]
 travis-ci = { repository = "dalance/amber" }
+appveyor = { repository = "dalance/amber" }
 
 [[bin]]
 name = "ambr"
