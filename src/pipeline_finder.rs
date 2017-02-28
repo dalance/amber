@@ -60,11 +60,16 @@ impl PipelineFinder {
         }
     }
 
-    fn find_path( &mut self, base: PathBuf, tx: &Vec<Sender<PipelineInfo<PathInfo>>> ) {
+    fn find_path( &mut self, base: PathBuf, tx: &Vec<Sender<PipelineInfo<PathInfo>>>, is_symlink: bool ) {
 
         let attr = match fs::metadata( &base ) {
             Ok ( x ) => x,
-            Err( e ) => { self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) ); return; },
+            Err( e ) => {
+                if !is_symlink {
+                    self.errors.push( format!( "Error: {} @ {}", e, base.to_str().unwrap() ) );
+                }
+                return;
+            },
         };
 
         if attr.is_file() {
@@ -98,7 +103,7 @@ impl PipelineFinder {
                             let find_dir     = file_type.is_dir()     & self.is_recursive;
                             let find_symlink = file_type.is_symlink() & self.is_recursive & self.follow_symlink;
                             if ( find_dir | find_symlink ) & self.check_path( &entry.path(), true ) {
-                                self.find_path( entry.path(), &tx );
+                                self.find_path( entry.path(), &tx, find_symlink );
                             }
                         }
                     },
@@ -199,7 +204,7 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
                 Ok( PipelineInfo::SeqDat( _, p ) ) => {
                     watch_time!( self.time_bsy, {
                         let p = self.set_default_gitignore( &p );
-                        self.find_path( p, &tx );
+                        self.find_path( p, &tx, false );
                     } );
                 },
 
