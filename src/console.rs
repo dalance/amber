@@ -4,7 +4,7 @@ use matcher::Match;
 use std::io;
 use std::io::Write;
 use std::process;
-use term::{Terminal, StdoutTerminal, StderrTerminal};
+use term::{StdoutTerminal, StderrTerminal};
 use term::color::Color;
 
 // ---------------------------------------------------------------------------------------------------------------------

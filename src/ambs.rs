@@ -13,7 +13,6 @@ use amber::pipeline_printer::PipelinePrinter;
 use amber::util::{decode_error, read_from_file, as_secsf64};
 use docopt::Docopt;
 use std::cmp;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process;
 use std::sync::mpsc;
@@ -269,9 +268,6 @@ fn main() {
         time_matcher_all.push( Duration::new(0, 0) );
     }
 
-    let mut count_finder  = 0;
-    let mut count_matcher = 0;
-
     loop {
         match rx_main.try_recv() {
             Ok ( PipelineInfo::SeqEnd ( _          ) ) => break,
@@ -310,9 +306,6 @@ fn main() {
         }
         console.write( ConsoleTextKind::Info, &format!( "    Sort     : {}s / {}s\n"  , sec_sorter_bsy  , sec_sorter_all   ) );
         console.write( ConsoleTextKind::Info, &format!( "    Display  : {}s / {}s\n\n", sec_printer_bsy , sec_printer_all  ) );
-        console.write( ConsoleTextKind::Info, &format!( "  Path count\n" ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Found    : {}\n"   , count_finder  ) );
-        console.write( ConsoleTextKind::Info, &format!( "    Matched  : {}\n"   , count_matcher ) );
     }
 
     console.reset();
