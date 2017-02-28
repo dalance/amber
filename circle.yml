@@ -1,6 +1,7 @@
 machine:
     post:
         - eval "$(ssh-agent -s)"; ssh-add ~/.ssh/id_circleci_github
+        - rm $HOME/.gitconfig
 
 dependencies:
     post:
