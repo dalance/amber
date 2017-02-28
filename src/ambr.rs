@@ -12,6 +12,7 @@ use amber::pipeline_sorter::PipelineSorter;
 use amber::pipeline_replacer::PipelineReplacer;
 use amber::util::{decode_error, read_from_file, as_secsf64};
 use docopt::Docopt;
+use std::cmp;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process;
@@ -115,7 +116,8 @@ fn main() {
         format!( "ambs version {}", VERSION )
     };
 
-    let usage = String::from( USAGE ).replace( "num_cpus", &format!( "{}", num_cpus::get() ) );
+    let num_cpus = cmp::min( 4, num_cpus::get() );
+    let usage = String::from( USAGE ).replace( "num_cpus", &format!( "{}", num_cpus ) );
     let args: Args = Docopt::new( usage ).and_then( |d| d.version( Some( version ) ).decode() ).unwrap_or_else( |e| e.exit() );
 
     let mut console = Console::new();
