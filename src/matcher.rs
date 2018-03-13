@@ -242,15 +242,15 @@ impl TbmMatcher {
             }
 
             unsafe {
-                let ret = memcmp( src_ptr.offset( ( i - pat_len + 1 ) as isize ), pat_ptr, pat_len );
+                let ret = memcmp( src_ptr.offset( ( i + 1 - pat_len ) as isize ), pat_ptr, pat_len );
                 if ret != 0 {
                     i += md2;
                     continue 'outer;
                 }
             }
 
-            if MatcherUtil::check_char_boundary( src, i - pat_len + 1 ) {
-                ret.push( Match { beg: i - pat_len + 1, end: i + 1, sub_match: Vec::new() } );
+            if MatcherUtil::check_char_boundary( src, i + 1 - pat_len ) {
+                ret.push( Match { beg: i + 1 - pat_len, end: i + 1, sub_match: Vec::new() } );
                 i += pat_len;
                 continue;
             }

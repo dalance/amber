@@ -103,7 +103,7 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pipeline::{Pipeline, PipelineInfo, PipelineJoin};
+    use pipeline::{PipelineInfo, PipelineJoin};
     use pipeline_matcher::PathMatch;
     use std::path::PathBuf;
     use std::thread;
