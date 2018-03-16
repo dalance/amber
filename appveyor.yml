@@ -20,6 +20,8 @@ install:
     - cmd: rust-%RUST_VERSION%-%RUST_INSTALL_TRIPLE%.exe /VERYSILENT /NORESTART /DIR="%RUST_INSTALL_DIR%"
     - cmd: SET PATH=%PATH%;%RUST_INSTALL_DIR%\bin
 
+build: false
+
 build_script:
     - cmd: cargo build --release --target=%RUST_INSTALL_TRIPLE%
 
