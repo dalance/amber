@@ -6,27 +6,28 @@ platform:
     - x64
 
 environment:
-    RUST_INSTALL_DIR: C:\Rust
-    matrix:
-        - RUST_INSTALL_TRIPLE: i686-pc-windows-msvc
-          RUST_VERSION: 1.9.0
-          ARCH: i686
-        - RUST_INSTALL_TRIPLE: x86_64-pc-windows-msvc
-          RUST_VERSION: 1.9.0
-          ARCH: x86_64
+  matrix:
+    - TARGET: i686-pc-windows-msvc
+      CHANNEL: stable
+      ARCH: i686
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: stable
+      ARCH: x86_64
 
 install:
-    - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-${env:RUST_VERSION}-${env:RUST_INSTALL_TRIPLE}.exe"
-    - cmd: rust-%RUST_VERSION%-%RUST_INSTALL_TRIPLE%.exe /VERYSILENT /NORESTART /DIR="%RUST_INSTALL_DIR%"
-    - cmd: SET PATH=%PATH%;%RUST_INSTALL_DIR%\bin
+    - curl -sSf -o rustup-init.exe https://win.rustup.rs
+    - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% -y
+    - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+    - rustc -Vv
+    - cargo -V
 
 build: false
 
 build_script:
-    - cmd: cargo build --release --target=%RUST_INSTALL_TRIPLE%
+    - cmd: cargo build --release --target=%TARGET%
 
 after_build:
-    - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\target\%RUST_INSTALL_TRIPLE%\release\amb*.exe
+    - cmd: 7z a amber-%APPVEYOR_REPO_TAG_NAME%-%ARCH%-win.zip %APPVEYOR_BUILD_FOLDER%\target\%TARGET%\release\amb*.exe
 
 test_script:
     - cmd: cargo test
