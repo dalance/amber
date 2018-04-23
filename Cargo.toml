@@ -1,17 +1,18 @@
 [package]
 name = "amber"
-version = "0.3.3"
+version = "0.3.4-pre"
 authors = ["dalance@gmail.com"]
 repository = "https://github.com/dalance/amber"
 keywords = ["search", "replace"]
-categories = ["command-line-utilities"]
+categories = ["command-line-utilities", "development-tools"]
 license = "MIT"
 readme = "README.md"
 description = "A code search and replace tool"
 
 [badges]
 travis-ci = { repository = "dalance/amber" }
-appveyor = { repository = "dalance/amber" }
+appveyor  = { repository = "dalance/amber", branch = "master", service = "github" }
+codecov   = { repository = "dalance/amber", branch = "master", service = "github" }
 
 [[bin]]
 name = "ambr"
@@ -64,3 +65,9 @@ lto              = false
 debug-assertions = false
 codegen-units    = 1
 
+[package.metadata.release]
+dev-version-ext            = "pre"
+pre-release-commit-message = "Prepare to v{{version}}"
+pro-release-commit-message = "Start next development iteration v{{version}}"
+tag-message                = "Bump version to {{version}}"
+tag-prefix                 = "v"
