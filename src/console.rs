@@ -4,8 +4,8 @@ use matcher::Match;
 use std::io;
 use std::io::Write;
 use std::process;
-use term::{StderrTerminal, StdoutTerminal};
 use term::color::Color;
+use term::{StderrTerminal, StdoutTerminal};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Console
@@ -124,20 +124,11 @@ impl Console {
         };
 
         if beg < m.beg {
-            self.write(
-                ConsoleTextKind::Text,
-                &String::from_utf8_lossy(&src[beg..m.beg]),
-            );
+            self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..m.beg]));
         }
-        self.write(
-            ConsoleTextKind::MatchText,
-            &String::from_utf8_lossy(&src[m.beg..m.end]),
-        );
+        self.write(ConsoleTextKind::MatchText, &String::from_utf8_lossy(&src[m.beg..m.end]));
         if m.end < end {
-            self.write(
-                ConsoleTextKind::Text,
-                &String::from_utf8_lossy(&src[m.end..end]),
-            );
+            self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[m.end..end]));
         }
         self.write(ConsoleTextKind::Text, "\n");
     }

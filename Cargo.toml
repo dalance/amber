@@ -28,8 +28,8 @@ statistics = []
 
 [dependencies]
 ctrlc             = "2.0.0"
-docopt            = "0.6.78"
 glob              = "0.2.11"
+lazy_static       = "1.0.0"
 memmap            = "0.2.3"
 num_cpus          = "0.2.10"
 regex             = "0.1.47"
@@ -37,6 +37,7 @@ rand              = "0.3.13"
 rlibc             = "1.0.0"
 rustc-serialize   = "0.3.16"
 scoped_threadpool = "0.1.6"
+structopt         = "0.2.5"
 tempfile          = "2.0.1"
 term              = "0.4.4"
 time              = "0.1.34"

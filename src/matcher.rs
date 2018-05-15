@@ -584,39 +584,12 @@ impl MatcherUtil {
     fn check_char_width(src: &[u8], pos: usize) -> usize {
         let src_len = src.len();
         let pos0 = pos;
-        let pos1 = if pos + 1 >= src_len {
-            src_len - 1
-        } else {
-            pos + 1
-        };
-        let pos2 = if pos + 2 >= src_len {
-            src_len - 1
-        } else {
-            pos + 2
-        };
-        let pos3 = if pos + 3 >= src_len {
-            src_len - 1
-        } else {
-            pos + 3
-        };
-        let pos4 = if pos + 4 >= src_len {
-            src_len - 1
-        } else {
-            pos + 4
-        };
-        let pos5 = if pos + 5 >= src_len {
-            src_len - 1
-        } else {
-            pos + 5
-        };
-        match (
-            src[pos0],
-            src[pos1],
-            src[pos2],
-            src[pos3],
-            src[pos4],
-            src[pos5],
-        ) {
+        let pos1 = if pos + 1 >= src_len { src_len - 1 } else { pos + 1 };
+        let pos2 = if pos + 2 >= src_len { src_len - 1 } else { pos + 2 };
+        let pos3 = if pos + 3 >= src_len { src_len - 1 } else { pos + 3 };
+        let pos4 = if pos + 4 >= src_len { src_len - 1 } else { pos + 4 };
+        let pos5 = if pos + 5 >= src_len { src_len - 1 } else { pos + 5 };
+        match (src[pos0], src[pos1], src[pos2], src[pos3], src[pos4], src[pos5]) {
             (0x00...0x7f, _, _, _, _, _) => (1),                                         // ASCII
             (0xc2...0xdf, 0x80...0xbf, _, _, _, _) => (2),                               // UTF-8
             (0xe0...0xef, 0x80...0xbf, 0x80...0xbf, _, _, _) => (3),                     // UTF-8
@@ -681,9 +654,7 @@ mod tests {
         let ret = m.search(&src, &pat);
         assert!(ret.is_empty());
 
-        let src = "abcabcあいうえおaあああaaaabc"
-            .to_string()
-            .into_bytes();
+        let src = "abcabcあいうえおaあああaaaabc".to_string().into_bytes();
         let pat = "あ".to_string().into_bytes();
         let ret = m.search(&src, &pat);
         assert_eq!(ret.len(), 4);

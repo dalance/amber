@@ -9,8 +9,8 @@ use std::io::{Error, Write};
 use std::process;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
-use util::{catch, decode_error};
 use tempfile::NamedTempFile;
+use util::{catch, decode_error};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineReplacer
@@ -84,8 +84,7 @@ impl PipelineReplacer {
                     let mut do_replace = true;
                     if self.is_interactive & !self.all_replace {
                         if self.print_file {
-                            self.console
-                                .write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
+                            self.console.write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
                             self.console.write(ConsoleTextKind::Other, ": ");
                         }
                         if self.print_column | self.print_row {
@@ -97,8 +96,7 @@ impl PipelineReplacer {
                                 pos += 1;
                             }
                             if self.print_column {
-                                self.console
-                                    .write(ConsoleTextKind::Other, &format!("{}:", column + 1));
+                                self.console.write(ConsoleTextKind::Other, &format!("{}:", column + 1));
                             }
                             if self.print_row {
                                 self.console
@@ -216,11 +214,7 @@ impl Pipeline<PathMatch, ()> for PipelineReplacer {
                         let _ = tx.send(PipelineInfo::MsgErr(id, e.clone()));
                     }
 
-                    let _ = tx.send(PipelineInfo::MsgTime(
-                        id,
-                        self.time_bsy,
-                        self.time_beg.elapsed(),
-                    ));
+                    let _ = tx.send(PipelineInfo::MsgTime(id, self.time_bsy, self.time_beg.elapsed()));
                     let _ = tx.send(PipelineInfo::SeqEnd(x));
                     break;
                 }

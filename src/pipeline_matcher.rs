@@ -2,8 +2,8 @@ use matcher::{Match, Matcher};
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_finder::PathInfo;
-use std::io::{Error, Read};
 use std::fs::File;
+use std::io::{Error, Read};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
@@ -82,8 +82,7 @@ impl<T: Matcher> PipelineMatcher<T> {
                 }
                 if is_binary {
                     if self.print_skipped {
-                        self.infos
-                            .push(format!("Skipped: {:?} ( binary file )\n", info.path));
+                        self.infos.push(format!("Skipped: {:?} ( binary file )\n", info.path));
                     }
                     return Ok(PathMatch {
                         path: info.path.clone(),
@@ -103,11 +102,8 @@ impl<T: Matcher> PipelineMatcher<T> {
         match result {
             Ok(x) => x,
             Err(e) => {
-                self.errors.push(format!(
-                    "Error: {} @ {:?}\n",
-                    decode_error(e.kind()),
-                    path_org
-                ));
+                self.errors
+                    .push(format!("Error: {} @ {:?}\n", decode_error(e.kind()), path_org));
                 PathMatch {
                     path: info.path.clone(),
                     matches: Vec::new(),
@@ -148,11 +144,7 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
                         let _ = tx.send(PipelineInfo::MsgErr(id, e.clone()));
                     }
 
-                    let _ = tx.send(PipelineInfo::MsgTime(
-                        id,
-                        self.time_bsy,
-                        self.time_beg.elapsed(),
-                    ));
+                    let _ = tx.send(PipelineInfo::MsgTime(id, self.time_bsy, self.time_beg.elapsed()));
                     let _ = tx.send(PipelineInfo::SeqEnd(x));
                     break;
                 }
@@ -183,8 +175,8 @@ mod tests {
     use pipeline::{Pipeline, PipelineInfo};
     use pipeline_finder::PathInfo;
     use std::path::PathBuf;
-    use std::thread;
     use std::sync::mpsc;
+    use std::thread;
 
     #[test]
     fn pipeline_matcher() {

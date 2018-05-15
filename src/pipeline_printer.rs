@@ -53,8 +53,7 @@ impl PipelinePrinter {
             let mut last_lf = 0;
             for m in &pm.matches {
                 if self.print_file {
-                    self.console
-                        .write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
+                    self.console.write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
                     self.console.write(ConsoleTextKind::Filename, ":");
                 }
                 if self.print_column | self.print_row {
@@ -66,8 +65,7 @@ impl PipelinePrinter {
                         pos += 1;
                     }
                     if self.print_column {
-                        self.console
-                            .write(ConsoleTextKind::Other, &format!("{}:", column + 1));
+                        self.console.write(ConsoleTextKind::Other, &format!("{}:", column + 1));
                     }
                     if self.print_row {
                         self.console
@@ -121,11 +119,7 @@ impl Pipeline<PathMatch, ()> for PipelinePrinter {
                         let _ = tx.send(PipelineInfo::MsgErr(id, e.clone()));
                     }
 
-                    let _ = tx.send(PipelineInfo::MsgTime(
-                        id,
-                        self.time_bsy,
-                        self.time_beg.elapsed(),
-                    ));
+                    let _ = tx.send(PipelineInfo::MsgTime(id, self.time_bsy, self.time_beg.elapsed()));
                     let _ = tx.send(PipelineInfo::SeqEnd(x));
                     break;
                 }

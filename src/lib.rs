@@ -1,7 +1,6 @@
 #![cfg_attr(feature = "sse", feature(asm))]
 
 extern crate ctrlc;
-extern crate docopt;
 extern crate glob;
 extern crate memmap;
 extern crate num_cpus;
@@ -21,6 +20,6 @@ pub mod matcher;
 pub mod pipeline;
 pub mod pipeline_finder;
 pub mod pipeline_matcher;
-pub mod pipeline_sorter;
 pub mod pipeline_printer;
 pub mod pipeline_replacer;
+pub mod pipeline_sorter;

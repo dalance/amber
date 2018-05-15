@@ -65,8 +65,7 @@ impl PipelineFinder {
             Ok(x) => x,
             Err(e) => {
                 if !is_symlink {
-                    self.errors
-                        .push(format!("Error: {} @ {}", e, base.to_str().unwrap()));
+                    self.errors.push(format!("Error: {} @ {}", e, base.to_str().unwrap()));
                 }
                 return;
             }
@@ -80,8 +79,7 @@ impl PipelineFinder {
             let reader = match fs::read_dir(&base) {
                 Ok(x) => x,
                 Err(e) => {
-                    self.errors
-                        .push(format!("Error: {} @ {}", e, base.to_str().unwrap()));
+                    self.errors.push(format!("Error: {} @ {}", e, base.to_str().unwrap()));
                     return;
                 }
             };
@@ -127,13 +125,7 @@ impl PipelineFinder {
 
     fn send_path(&mut self, path: PathBuf, len: u64, tx: &Vec<Sender<PipelineInfo<PathInfo>>>) {
         if self.check_path(&path, false) {
-            let _ = tx[self.current_tx].send(PipelineInfo::SeqDat(
-                self.seq_no,
-                PathInfo {
-                    path: path,
-                    len: len,
-                },
-            ));
+            let _ = tx[self.current_tx].send(PipelineInfo::SeqDat(self.seq_no, PathInfo { path: path, len: len }));
             self.seq_no += 1;
             self.current_tx = if self.current_tx == tx.len() - 1 {
                 0
@@ -183,13 +175,11 @@ impl PipelineFinder {
         };
 
         if !ok_vcs & self.print_skipped {
-            self.infos
-                .push(format!("Skipped: {:?} ( vcs file )\n", path));
+            self.infos.push(format!("Skipped: {:?} ( vcs file )\n", path));
         }
 
         if !ok_git & self.print_skipped {
-            self.infos
-                .push(format!("Skipped: {:?} ( .gitignore )\n", path));
+            self.infos.push(format!("Skipped: {:?} ( .gitignore )\n", path));
         }
 
         ok_vcs && ok_git
@@ -206,8 +196,7 @@ impl PipelineFinder {
         let base_abs = match base.canonicalize() {
             Ok(x) => x,
             Err(e) => {
-                self.errors
-                    .push(format!("Error: {} @ {}", e, base.to_str().unwrap()));
+                self.errors.push(format!("Error: {} @ {}", e, base.to_str().unwrap()));
                 return base.clone();
             }
         };
@@ -264,11 +253,7 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
                         let _ = tx[0].send(PipelineInfo::MsgErr(id, e.clone()));
                     }
 
-                    let _ = tx[0].send(PipelineInfo::MsgTime(
-                        id,
-                        self.time_bsy,
-                        self.time_beg.elapsed(),
-                    ));
+                    let _ = tx[0].send(PipelineInfo::MsgTime(id, self.time_bsy, self.time_beg.elapsed()));
 
                     for tx in &tx {
                         let _ = tx.send(PipelineInfo::SeqEnd(self.seq_no));
@@ -299,10 +284,10 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-    use std::thread;
-    use std::sync::mpsc;
     use pipeline::{PipelineFork, PipelineInfo};
+    use std::path::PathBuf;
+    use std::sync::mpsc;
+    use std::thread;
 
     fn test<T: 'static + PipelineFork<PathBuf, PathInfo> + Send>(mut finder: T, path: String) -> Vec<PathInfo> {
         let (in_tx, in_rx) = mpsc::channel();
@@ -334,15 +319,9 @@ mod tests {
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./Cargo.toml")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/ambr.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/ambs.rs")));
-        assert!(
-            ret.iter()
-                .any(|x| x.path == PathBuf::from("./src/console.rs"))
-        );
+        assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/console.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/lib.rs")));
-        assert!(
-            ret.iter()
-                .any(|x| x.path == PathBuf::from("./src/matcher.rs"))
-        );
+        assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/matcher.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/util.rs")));
         assert!(!ret.iter().any(|x| x.path == PathBuf::from("./.git/config")));
     }
@@ -356,15 +335,9 @@ mod tests {
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./Cargo.toml")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/ambr.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/ambs.rs")));
-        assert!(
-            ret.iter()
-                .any(|x| x.path == PathBuf::from("./src/console.rs"))
-        );
+        assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/console.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/lib.rs")));
-        assert!(
-            ret.iter()
-                .any(|x| x.path == PathBuf::from("./src/matcher.rs"))
-        );
+        assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/matcher.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./src/util.rs")));
         assert!(ret.iter().any(|x| x.path == PathBuf::from("./.git/config")));
     }

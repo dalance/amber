@@ -87,11 +87,7 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
                             let _ = tx.send(PipelineInfo::MsgErr(id, e.clone()));
                         }
 
-                        let _ = tx.send(PipelineInfo::MsgTime(
-                            id,
-                            self.time_bsy,
-                            self.time_beg.elapsed(),
-                        ));
+                        let _ = tx.send(PipelineInfo::MsgTime(id, self.time_bsy, self.time_beg.elapsed()));
                         let _ = tx.send(PipelineInfo::SeqEnd(x));
                         break;
                     }
@@ -122,8 +118,8 @@ mod tests {
     use pipeline::{PipelineInfo, PipelineJoin};
     use pipeline_matcher::PathMatch;
     use std::path::PathBuf;
-    use std::thread;
     use std::sync::mpsc;
+    use std::thread;
 
     #[test]
     fn pipeline_sorter() {

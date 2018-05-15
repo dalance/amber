@@ -1,153 +1,179 @@
 extern crate amber;
-extern crate docopt;
+#[macro_use]
+extern crate lazy_static;
 extern crate num_cpus;
 extern crate rustc_serialize;
+#[macro_use]
+extern crate structopt;
 
 use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{QuickSearchMatcher, RegexMatcher, TbmMatcher};
 use amber::pipeline::{Pipeline, PipelineFork, PipelineInfo, PipelineJoin};
 use amber::pipeline_finder::PipelineFinder;
 use amber::pipeline_matcher::PipelineMatcher;
-use amber::pipeline_sorter::PipelineSorter;
 use amber::pipeline_replacer::PipelineReplacer;
+use amber::pipeline_sorter::PipelineSorter;
 use amber::util::{decode_error, read_from_file, as_secsf64};
-use docopt::Docopt;
 use std::cmp;
 use std::path::PathBuf;
 use std::process;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use structopt::{clap, StructOpt};
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Usage
+// Opt
 // ---------------------------------------------------------------------------------------------------------------------
 
-#[allow(dead_code)]
-static USAGE: &'static str = "
-Replace <keyword> to <replacement> from current directory or <paths>
+#[derive(Debug, StructOpt)]
+#[structopt(name = "ambr")]
+#[structopt(raw(long_version = "option_env!(\"LONG_VERSION\").unwrap_or(env!(\"CARGO_PKG_VERSION\"))"))]
+#[structopt(raw(setting = "clap::AppSettings::ColoredHelp"))]
+#[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+pub struct Opt {
+    /// Keyword for search
+    #[structopt(name = "KEYWORD", required_unless = "key_file")]
+    pub keyword: Option<String>,
 
-Usage:
-    ambr [options] ( <keyword> | --key-file <file> ) ( <replacement> | --rep-file <file> )
-    ambr [options] ( <keyword> | --key-file <file> ) ( <replacement> | --rep-file <file> ) <paths>...
-    ambr ( --help | --version )
+    /// Keyword for replace
+    #[structopt(name = "REPLACEMENT", required_unless = "rep_file")]
+    pub replacement: Option<String>,
 
-Options:
-    --key-file <file>          Use file contents as keyword
-    --rep-file <file>          Use file contents as replacement
-    --max-threads <num>        Number of max threads [default: num_cpus]
-    --size-per-thread <bytes>  File size per one thread [default: 1048576]
-    --bin-check-bytes <bytes>  Read size by byte for checking binary [default: 256]
-    --regex                    Enable regular expression search
-    --column                   Enable column output
-    --row                      Enable row output
-    --binary                   Enable binary file search
-    --statistics               Enable statistics output
-    --skipped                  Enable skipped file output
-    --no-interactive           Disable interactive replace
-    --no-recursive             Disable recursive directory search
-    --no-symlink               Disable symbolic link follow
-    --no-color                 Disable colored output
-    --no-file                  Disable filename output
-    --no-skip-vcs              Disable vcs directory ( .hg/.git/.svn ) skip
-    --no-skip-gitignore        Disable .gitignore skip
-    --no-fixed-order           Disable output order guarantee
-    --no-parent-ignore         Disable .*ignore file search at parent directories
-    -h --help                  Show this message
-    -v --version               Show version
+    /// Use file contents as KEYWORD
+    #[structopt(long = "key-file", value_name = "FILE")]
+    pub key_file: Option<String>,
 
-Experimental Options:
-    --mmap-bytes <bytes>       Minimum size by byte for using mmap [default: 1048576]
-    --tbm                      Enable TBM matcher
-    --sse                      Enable SSE 4.2
-";
+    /// Use file contents as REPLACEMENT
+    #[structopt(long = "rep-file", value_name = "FILE")]
+    pub rep_file: Option<String>,
 
-#[allow(dead_code)]
-static VERSION: &'static str = env!("CARGO_PKG_VERSION");
-static BUILD_TIME: Option<&'static str> = option_env!("BUILD_TIME");
-static GIT_REVISION: Option<&'static str> = option_env!("GIT_REVISION");
+    /// Search paths
+    #[structopt(name = "PATHS")]
+    pub paths: Vec<String>,
 
-#[derive(RustcDecodable, Debug)]
-struct Args {
-    arg_keyword: String,
-    arg_replacement: String,
-    arg_paths: Vec<String>,
-    flag_key_file: Option<String>,
-    flag_rep_file: Option<String>,
-    flag_max_threads: usize,
-    flag_size_per_thread: usize,
-    flag_bin_check_bytes: usize,
-    flag_mmap_bytes: u64,
-    flag_regex: bool,
-    flag_column: bool,
-    flag_row: bool,
-    flag_binary: bool,
-    flag_statistics: bool,
-    flag_skipped: bool,
-    flag_no_interactive: bool,
-    flag_no_recursive: bool,
-    flag_no_symlink: bool,
-    flag_no_color: bool,
-    flag_no_file: bool,
-    flag_no_skip_vcs: bool,
-    flag_no_skip_gitignore: bool,
-    flag_no_fixed_order: bool,
-    flag_no_parent_ignore: bool,
-    flag_tbm: bool,
-    flag_sse: bool,
+    /// Number of max threads
+    #[structopt(long = "max-threads", raw(default_value = "&MAX_THREADS"), value_name = "NUM")]
+    pub max_threads: usize,
+
+    /// File size per one thread
+    #[structopt(long = "size-per-thread", default_value = "1048576", value_name = "BYTES")]
+    pub size_per_thread: usize,
+
+    /// Read size for checking binary
+    #[structopt(long = "bin-check-bytes", default_value = "256", value_name = "BYTES")]
+    pub bin_check_bytes: usize,
+
+    /// [Experimental] Minimum size for using mmap
+    #[structopt(long = "mmap-bytes", default_value = "1048576", value_name = "BYTES")]
+    pub mmap_bytes: u64,
+
+    /// Enable regular expression search
+    #[structopt(long = "regex")]
+    pub regex: bool,
+
+    /// Enable column output
+    #[structopt(long = "column")]
+    pub column: bool,
+
+    /// Enable row output
+    #[structopt(long = "row")]
+    pub row: bool,
+
+    /// Enable binary file search
+    #[structopt(long = "binary")]
+    pub binary: bool,
+
+    /// Enable statistics output
+    #[structopt(long = "statistics")]
+    pub statistics: bool,
+
+    /// Enable skipped file output
+    #[structopt(long = "skipped")]
+    pub skipped: bool,
+
+    /// Disable interactive replace
+    #[structopt(long = "no-interactive")]
+    pub no_interactive: bool,
+
+    /// Disable recursive directory search
+    #[structopt(long = "no-recursive")]
+    pub no_recursive: bool,
+
+    /// Disable symbolic link follow
+    #[structopt(long = "no-symlink")]
+    pub no_symlink: bool,
+
+    /// Disable colored output
+    #[structopt(long = "no-color")]
+    pub no_color: bool,
+
+    /// Disable filename output
+    #[structopt(long = "no-file")]
+    pub no_file: bool,
+
+    /// Disable vcs directory ( .hg/.git/.svn ) skip
+    #[structopt(long = "no-skip-vcs")]
+    pub no_skip_vcs: bool,
+
+    /// Disable .gitignore skip
+    #[structopt(long = "no-skip-gitignore")]
+    pub no_skip_gitignore: bool,
+
+    /// Disable output order guarantee
+    #[structopt(long = "no-fixed-order")]
+    pub no_fixed_order: bool,
+
+    /// Disable .*ignore file search at parent directories
+    #[structopt(long = "no-parent-ignore")]
+    pub no_parent_ignore: bool,
+
+    /// [Experimental] Enable TBM matcher
+    #[structopt(long = "tbm")]
+    pub tbm: bool,
+
+    /// [Experimental] Enable SSE 4.2
+    #[structopt(long = "sse")]
+    pub sse: bool,
+}
+
+lazy_static! {
+    static ref MAX_THREADS: String = format!("{}", cmp::min(4, num_cpus::get()));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------------------------------------------------
 
-#[allow(dead_code)]
 fn main() {
     // ---------------------------------------------------------------------------------------------
     // Parse Arguments
     // ---------------------------------------------------------------------------------------------
 
-    // - Create config from Docopt ---------------------------------------------
-    let version = if BUILD_TIME.is_some() {
-        format!(
-            "ambs version {} ( {} {} )",
-            VERSION,
-            GIT_REVISION.unwrap_or(""),
-            BUILD_TIME.unwrap()
-        )
-    } else {
-        format!("ambs version {}", VERSION)
-    };
+    // - Create opt ------------------------------------------------------------
 
-    let num_cpus = cmp::min(4, num_cpus::get());
-    let usage = String::from(USAGE).replace("num_cpus", &format!("{}", num_cpus));
-    let args: Args = Docopt::new(usage)
-        .and_then(|d| d.version(Some(version)).decode())
-        .unwrap_or_else(|e| e.exit());
+    let opt = Opt::from_args();
 
     let mut console = Console::new();
-    console.is_color = !args.flag_no_color;
+    console.is_color = !opt.no_color;
 
     // - Set base path, keyword and replacement --------------------------------
     let mut base_paths: Vec<PathBuf> = Vec::new();
-    if args.arg_paths.is_empty() {
+    if opt.paths.is_empty() {
         base_paths.push(PathBuf::from("./"));
     } else {
-        for p in &args.arg_paths {
+        for p in &opt.paths {
             base_paths.push(PathBuf::from(p));
         }
     }
 
-    let keyword = match args.flag_key_file {
+    let keyword = match opt.key_file {
         Some(f) => match read_from_file(&f) {
             Ok(x) => {
                 if x.len() != 0 {
                     x
                 } else {
-                    console.write(
-                        ConsoleTextKind::Error,
-                        &format!("Error: file is empty @ {:?}\n", f),
-                    );
+                    console.write(ConsoleTextKind::Error, &format!("Error: file is empty @ {:?}\n", f));
                     process::exit(1);
                 }
             }
@@ -159,10 +185,10 @@ fn main() {
                 process::exit(1);
             }
         },
-        None => args.arg_keyword.clone().into_bytes(),
+        None => opt.keyword.unwrap().clone().into_bytes(),
     };
 
-    let replacement = match args.flag_rep_file {
+    let replacement = match opt.rep_file {
         Some(f) => match read_from_file(&f) {
             Ok(x) => x,
             Err(e) => {
@@ -173,7 +199,7 @@ fn main() {
                 process::exit(1);
             }
         },
-        None => args.arg_replacement.clone().into_bytes(),
+        None => opt.replacement.unwrap().clone().into_bytes(),
     };
 
     // ---------------------------------------------------------------------------------------------
@@ -185,7 +211,7 @@ fn main() {
     let id_replacer = 2;
     let id_matcher = 3;
 
-    let matcher_num = args.flag_max_threads;
+    let matcher_num = opt.max_threads;
 
     let (tx_finder, rx_finder) = mpsc::channel();
     let (tx_replacer, rx_replacer) = mpsc::channel();
@@ -198,27 +224,27 @@ fn main() {
     let mut sorter = PipelineSorter::new(matcher_num);
     let mut replacer = PipelineReplacer::new(&replacement);
 
-    finder.is_recursive = !args.flag_no_recursive;
-    finder.follow_symlink = !args.flag_no_symlink;
-    finder.skip_vcs = !args.flag_no_skip_vcs;
-    finder.skip_gitignore = !args.flag_no_skip_gitignore;
-    finder.print_skipped = args.flag_skipped;
-    finder.find_parent_ignore = !args.flag_no_parent_ignore;
-    sorter.through = args.flag_no_fixed_order;
-    replacer.is_color = !args.flag_no_color;
-    replacer.is_interactive = !args.flag_no_interactive;
-    replacer.print_file = !args.flag_no_file;
-    replacer.print_column = args.flag_column;
-    replacer.print_row = args.flag_row;
+    finder.is_recursive = !opt.no_recursive;
+    finder.follow_symlink = !opt.no_symlink;
+    finder.skip_vcs = !opt.no_skip_vcs;
+    finder.skip_gitignore = !opt.no_skip_gitignore;
+    finder.print_skipped = opt.skipped;
+    finder.find_parent_ignore = !opt.no_parent_ignore;
+    sorter.through = opt.no_fixed_order;
+    replacer.is_color = !opt.no_color;
+    replacer.is_interactive = !opt.no_interactive;
+    replacer.print_file = !opt.no_file;
+    replacer.print_column = opt.column;
+    replacer.print_row = opt.row;
 
-    let use_regex = args.flag_regex;
-    let use_tbm = args.flag_tbm;
-    let skip_binary = !args.flag_binary;
-    let print_skipped = args.flag_skipped;
-    let binary_check_bytes = args.flag_bin_check_bytes;
-    let mmap_bytes = args.flag_mmap_bytes;
-    let max_threads = args.flag_max_threads;
-    let size_per_thread = args.flag_size_per_thread;
+    let use_regex = opt.regex;
+    let use_tbm = opt.tbm;
+    let skip_binary = !opt.binary;
+    let print_skipped = opt.skipped;
+    let binary_check_bytes = opt.bin_check_bytes;
+    let mmap_bytes = opt.mmap_bytes;
+    let max_threads = opt.max_threads;
+    let size_per_thread = opt.size_per_thread;
 
     for i in 0..matcher_num {
         let keyword = keyword.clone();
@@ -227,58 +253,50 @@ fn main() {
         tx_matcher.push(tx_in);
         rx_sorter.push(rx_out);
 
-        let _ = thread::Builder::new()
-            .name("matcher".to_string())
-            .spawn(move || {
-                if use_regex {
-                    let m = RegexMatcher::new();
-                    let mut matcher = PipelineMatcher::new(m, &keyword);
-                    matcher.skip_binary = skip_binary;
-                    matcher.print_skipped = print_skipped;
-                    matcher.binary_check_bytes = binary_check_bytes;
-                    matcher.mmap_bytes = mmap_bytes;
-                    matcher.setup(id_matcher + i, rx_in, tx_out);
-                } else if use_tbm {
-                    let mut m = TbmMatcher::new();
-                    m.max_threads = max_threads;
-                    m.size_per_thread = size_per_thread;
-                    let mut matcher = PipelineMatcher::new(m, &keyword);
-                    matcher.skip_binary = skip_binary;
-                    matcher.print_skipped = print_skipped;
-                    matcher.binary_check_bytes = binary_check_bytes;
-                    matcher.mmap_bytes = mmap_bytes;
-                    matcher.setup(id_matcher + i, rx_in, tx_out);
-                } else {
-                    let mut m = QuickSearchMatcher::new();
-                    m.max_threads = max_threads;
-                    m.size_per_thread = size_per_thread;
-                    let mut matcher = PipelineMatcher::new(m, &keyword);
-                    matcher.skip_binary = skip_binary;
-                    matcher.print_skipped = print_skipped;
-                    matcher.binary_check_bytes = binary_check_bytes;
-                    matcher.mmap_bytes = mmap_bytes;
-                    matcher.setup(id_matcher + i, rx_in, tx_out);
-                };
-            });
+        let _ = thread::Builder::new().name("matcher".to_string()).spawn(move || {
+            if use_regex {
+                let m = RegexMatcher::new();
+                let mut matcher = PipelineMatcher::new(m, &keyword);
+                matcher.skip_binary = skip_binary;
+                matcher.print_skipped = print_skipped;
+                matcher.binary_check_bytes = binary_check_bytes;
+                matcher.mmap_bytes = mmap_bytes;
+                matcher.setup(id_matcher + i, rx_in, tx_out);
+            } else if use_tbm {
+                let mut m = TbmMatcher::new();
+                m.max_threads = max_threads;
+                m.size_per_thread = size_per_thread;
+                let mut matcher = PipelineMatcher::new(m, &keyword);
+                matcher.skip_binary = skip_binary;
+                matcher.print_skipped = print_skipped;
+                matcher.binary_check_bytes = binary_check_bytes;
+                matcher.mmap_bytes = mmap_bytes;
+                matcher.setup(id_matcher + i, rx_in, tx_out);
+            } else {
+                let mut m = QuickSearchMatcher::new();
+                m.max_threads = max_threads;
+                m.size_per_thread = size_per_thread;
+                let mut matcher = PipelineMatcher::new(m, &keyword);
+                matcher.skip_binary = skip_binary;
+                matcher.print_skipped = print_skipped;
+                matcher.binary_check_bytes = binary_check_bytes;
+                matcher.mmap_bytes = mmap_bytes;
+                matcher.setup(id_matcher + i, rx_in, tx_out);
+            };
+        });
     }
 
-    let _ = thread::Builder::new()
-        .name("finder".to_string())
-        .spawn(move || {
-            finder.setup(id_finder, rx_finder, tx_matcher);
-        });
+    let _ = thread::Builder::new().name("finder".to_string()).spawn(move || {
+        finder.setup(id_finder, rx_finder, tx_matcher);
+    });
 
-    let _ = thread::Builder::new()
-        .name("sorter".to_string())
-        .spawn(move || {
-            sorter.setup(id_sorter, rx_sorter, tx_replacer);
-        });
+    let _ = thread::Builder::new().name("sorter".to_string()).spawn(move || {
+        sorter.setup(id_sorter, rx_sorter, tx_replacer);
+    });
 
-    let _ = thread::Builder::new()
-        .name("replacer".to_string())
-        .spawn(move || {
-            replacer.setup(id_replacer, rx_replacer, tx_main);
-        });
+    let _ = thread::Builder::new().name("replacer".to_string()).spawn(move || {
+        replacer.setup(id_replacer, rx_replacer, tx_main);
+    });
 
     // ---------------------------------------------------------------------------------------------
     // Pipeline Flow
@@ -350,16 +368,13 @@ fn main() {
         sec_matcher_all.push(as_secsf64(time_matcher_all[i]));
     }
 
-    if args.flag_statistics {
+    if opt.statistics {
         console.write(ConsoleTextKind::Info, &format!("\nStatistics\n"));
         console.write(
             ConsoleTextKind::Info,
-            &format!("  Max threads: {}\n\n", args.flag_max_threads),
+            &format!("  Max threads: {}\n\n", opt.max_threads),
         );
-        console.write(
-            ConsoleTextKind::Info,
-            &format!("  Consumed time ( busy / total )\n"),
-        );
+        console.write(ConsoleTextKind::Info, &format!("  Consumed time ( busy / total )\n"));
         console.write(
             ConsoleTextKind::Info,
             &format!("    Find     : {}s / {}s\n", sec_finder_bsy, sec_finder_all),
@@ -379,10 +394,7 @@ fn main() {
         );
         console.write(
             ConsoleTextKind::Info,
-            &format!(
-                "    Replace  : {}s / {}s\n\n",
-                sec_replacer_bsy, sec_replacer_all
-            ),
+            &format!("    Replace  : {}s / {}s\n\n", sec_replacer_bsy, sec_replacer_all),
         );
     }
 
