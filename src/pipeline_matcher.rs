@@ -1,10 +1,11 @@
 use crossbeam_channel::{Receiver, Sender};
 use matcher::{Match, Matcher};
-use memmap::{Mmap, Protection};
+use memmap::Mmap;
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_finder::PathInfo;
 use std::fs::File;
 use std::io::{Error, Read};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use util::{catch, decode_error};
@@ -59,8 +60,9 @@ impl<T: Matcher> PipelineMatcher<T> {
             let mmap;
             let mut buf = Vec::new();
             let src = if info.len > self.mmap_bytes {
-                mmap = try!(Mmap::open_path(&info.path, Protection::Read));
-                unsafe { mmap.as_slice() }
+                let file = try!(File::open(&info.path));
+                mmap = try!(unsafe { Mmap::map(&file) });
+                mmap.deref()
             } else {
                 let mut f = try!(File::open(&info.path));
                 try!(f.read_to_end(&mut buf));

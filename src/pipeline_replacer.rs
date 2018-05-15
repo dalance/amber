@@ -1,12 +1,13 @@
 use console::{Console, ConsoleTextKind};
 use crossbeam_channel::{Receiver, Sender};
 use ctrlc;
-use memmap::{Mmap, Protection};
+use memmap::Mmap;
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
-use std::fs;
+use std::fs::{self, File};
 use std::io;
 use std::io::{Error, Write};
+use std::ops::Deref;
 use std::process;
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
@@ -59,7 +60,7 @@ impl PipelineReplacer {
             let mut tmpfile = try!(NamedTempFile::new_in(pm.path.parent().unwrap_or(&pm.path)));
 
             let tmpfile_path = tmpfile.path().to_path_buf();
-            ctrlc::set_handler(move || {
+            let _ = ctrlc::set_handler(move || {
                 let path = tmpfile_path.clone();
                 let mut console = Console::new();
                 console.write(
@@ -71,8 +72,9 @@ impl PipelineReplacer {
             });
 
             {
-                let mmap = try!(Mmap::open_path(&pm.path, Protection::Read));
-                let src = unsafe { mmap.as_slice() };
+                let file = try!(File::open(&pm.path));
+                let mmap = try!(unsafe { Mmap::map(&file) });
+                let src = mmap.deref();
 
                 let mut i = 0;
                 let mut pos = 0;

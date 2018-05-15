@@ -545,10 +545,9 @@ impl Matcher for RegexMatcher {
 
         let mut ret = Vec::new();
         for r in result {
-            let (beg, end) = r;
             ret.push(Match {
-                beg: beg,
-                end: end,
+                beg: r.start(),
+                end: r.end(),
                 sub_match: Vec::new(),
             });
         }

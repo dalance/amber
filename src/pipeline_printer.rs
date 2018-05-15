@@ -1,9 +1,11 @@
 use console::{Console, ConsoleTextKind};
 use crossbeam_channel::{Receiver, Sender};
-use memmap::{Mmap, Protection};
+use memmap::Mmap;
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
+use std::fs::File;
 use std::io::Error;
+use std::ops::Deref;
 use std::time::{Duration, Instant};
 use util::{catch, decode_error};
 
@@ -45,8 +47,9 @@ impl PipelinePrinter {
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error>(|| {
-            let mmap = try!(Mmap::open_path(&pm.path, Protection::Read));
-            let src = unsafe { mmap.as_slice() };
+            let file = try!(File::open(&pm.path));
+            let mmap = try!(unsafe { Mmap::map(&file) });
+            let src = mmap.deref();
 
             let mut pos = 0;
             let mut column = 0;
