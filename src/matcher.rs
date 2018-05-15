@@ -1,10 +1,10 @@
+use crossbeam_channel::unbounded;
 use regex::Regex;
 use rlibc::memcmp;
 use scoped_threadpool::Pool;
 use std::cmp;
 use std::collections::HashMap;
 use std::str;
-use std::sync::mpsc;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Matcher
@@ -182,7 +182,7 @@ impl Matcher for QuickSearchMatcher {
         if thread_num == 1 {
             self.search_sub(src, pat, &qs_table, 0, src_len)
         } else {
-            let (tx, rx) = mpsc::channel();
+            let (tx, rx) = unbounded();
             let mut pool = Pool::new(thread_num as u32);
 
             pool.scoped(|scoped| {
@@ -313,7 +313,7 @@ impl Matcher for TbmMatcher {
         if thread_num == 1 {
             self.search_sub(src, pat, &qs_table, md2, 0, src_len)
         } else {
-            let (tx, rx) = mpsc::channel();
+            let (tx, rx) = unbounded();
             let mut pool = Pool::new(thread_num as u32);
 
             pool.scoped(|scoped| {
@@ -479,7 +479,7 @@ impl Matcher for FjsMatcher {
         if thread_num == 1 {
             self.search_sub(src, pat, &betap, &delta, 0, src_len)
         } else {
-            let (tx, rx) = mpsc::channel();
+            let (tx, rx) = unbounded();
             let mut pool = Pool::new(thread_num as u32);
 
             pool.scoped(|scoped| {

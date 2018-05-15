@@ -1,8 +1,8 @@
+use crossbeam_channel::{Receiver, Sender};
 use ignore::{Ignore, IgnoreGit, IgnoreVcs};
 use pipeline::{PipelineFork, PipelineInfo};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -284,14 +284,14 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossbeam_channel::unbounded;
     use pipeline::{PipelineFork, PipelineInfo};
     use std::path::PathBuf;
-    use std::sync::mpsc;
     use std::thread;
 
     fn test<T: 'static + PipelineFork<PathBuf, PathInfo> + Send>(mut finder: T, path: String) -> Vec<PathInfo> {
-        let (in_tx, in_rx) = mpsc::channel();
-        let (out_tx, out_rx) = mpsc::channel();
+        let (in_tx, in_rx) = unbounded();
+        let (out_tx, out_rx) = unbounded();
         thread::spawn(move || {
             finder.setup(0, in_rx, vec![out_tx]);
         });

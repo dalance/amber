@@ -1,4 +1,5 @@
 extern crate amber;
+extern crate crossbeam_channel;
 #[macro_use]
 extern crate lazy_static;
 extern crate num_cpus;
@@ -14,10 +15,10 @@ use amber::pipeline_matcher::PipelineMatcher;
 use amber::pipeline_printer::PipelinePrinter;
 use amber::pipeline_sorter::PipelineSorter;
 use amber::util::{decode_error, read_from_file, as_secsf64};
+use crossbeam_channel::unbounded;
 use std::cmp;
 use std::path::PathBuf;
 use std::process;
-use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use structopt::{clap, StructOpt};
@@ -188,9 +189,9 @@ fn main() {
 
     let matcher_num = opt.max_threads;
 
-    let (tx_finder, rx_finder) = mpsc::channel();
-    let (tx_printer, rx_printer) = mpsc::channel();
-    let (tx_main, rx_main) = mpsc::channel();
+    let (tx_finder, rx_finder) = unbounded();
+    let (tx_printer, rx_printer) = unbounded();
+    let (tx_main, rx_main) = unbounded();
 
     let mut tx_matcher = Vec::new();
     let mut rx_sorter = Vec::new();
@@ -222,8 +223,8 @@ fn main() {
 
     for i in 0..matcher_num {
         let keyword = keyword.clone();
-        let (tx_in, rx_in) = mpsc::channel();
-        let (tx_out, rx_out) = mpsc::channel();
+        let (tx_in, rx_in) = unbounded();
+        let (tx_out, rx_out) = unbounded();
         tx_matcher.push(tx_in);
         rx_sorter.push(rx_out);
 

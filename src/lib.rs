@@ -1,5 +1,6 @@
 #![cfg_attr(feature = "sse", feature(asm))]
 
+extern crate crossbeam_channel;
 extern crate ctrlc;
 extern crate glob;
 extern crate memmap;

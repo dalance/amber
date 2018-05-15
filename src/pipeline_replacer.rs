@@ -1,4 +1,5 @@
 use console::{Console, ConsoleTextKind};
+use crossbeam_channel::{Receiver, Sender};
 use ctrlc;
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
@@ -7,7 +8,6 @@ use std::fs;
 use std::io;
 use std::io::{Error, Write};
 use std::process;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use util::{catch, decode_error};
@@ -237,17 +237,3 @@ impl Pipeline<PathMatch, ()> for PipelineReplacer {
 // ---------------------------------------------------------------------------------------------------------------------
 // Test
 // ---------------------------------------------------------------------------------------------------------------------
-
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//    use matcher::QuickSearchMatcher;
-//    use std::path::PathBuf;
-//    use std::thread;
-//    use std::sync::mpsc;
-//    use util::PipelineInfo;
-//
-//    #[test]
-//    fn test_simple_pipeline_printer() {
-//    }
-//}

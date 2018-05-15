@@ -1,4 +1,4 @@
-use std::sync::mpsc::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use std::time::Duration;
 
 pub enum PipelineInfo<T> {

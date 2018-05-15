@@ -1,3 +1,4 @@
+use crossbeam_channel::{Receiver, Sender};
 use matcher::{Match, Matcher};
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
@@ -5,7 +6,6 @@ use pipeline_finder::PathInfo;
 use std::fs::File;
 use std::io::{Error, Read};
 use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 use util::{catch, decode_error};
 
@@ -171,11 +171,11 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossbeam_channel::unbounded;
     use matcher::QuickSearchMatcher;
     use pipeline::{Pipeline, PipelineInfo};
     use pipeline_finder::PathInfo;
     use std::path::PathBuf;
-    use std::sync::mpsc;
     use std::thread;
 
     #[test]
@@ -183,8 +183,8 @@ mod tests {
         let qs = QuickSearchMatcher::new();
         let mut matcher = PipelineMatcher::new(qs, &"amber".to_string().into_bytes());
 
-        let (in_tx, in_rx) = mpsc::channel();
-        let (out_tx, out_rx) = mpsc::channel();
+        let (in_tx, in_rx) = unbounded();
+        let (out_tx, out_rx) = unbounded();
         thread::spawn(move || {
             matcher.setup(0, in_rx, out_tx);
         });

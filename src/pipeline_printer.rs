@@ -1,9 +1,9 @@
 use console::{Console, ConsoleTextKind};
+use crossbeam_channel::{Receiver, Sender};
 use memmap::{Mmap, Protection};
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
 use std::io::Error;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 use util::{catch, decode_error};
 

@@ -1,7 +1,7 @@
+use crossbeam_channel::{Receiver, Sender};
 use pipeline::{PipelineInfo, PipelineJoin};
 use pipeline_matcher::PathMatch;
 use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -115,18 +115,18 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossbeam_channel::unbounded;
     use pipeline::{PipelineInfo, PipelineJoin};
     use pipeline_matcher::PathMatch;
     use std::path::PathBuf;
-    use std::sync::mpsc;
     use std::thread;
 
     #[test]
     fn pipeline_sorter() {
         let mut sorter = PipelineSorter::new(1);
 
-        let (in_tx, in_rx) = mpsc::channel();
-        let (out_tx, out_rx) = mpsc::channel();
+        let (in_tx, in_rx) = unbounded();
+        let (out_tx, out_rx) = unbounded();
         thread::spawn(move || {
             sorter.setup(0, vec![in_rx], out_tx);
         });
