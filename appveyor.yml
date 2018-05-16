@@ -39,7 +39,7 @@ artifacts:
 deploy:
     provider: GitHub
     auth_token:
-        secure: YwL0NwyM+vym8U4Gxc8hbOEZ4+MHe6gMzTc9FebvvIoB3VLGSs7t4JtXQxiJixl9
+        secure: T560bHYMCb+I6z6/x0HJXdvlb7/rJpKvHp0l65bbaumzjMkHQ8ApKZBYWABBqtHm
     artifact: /.*\.zip/
     on:
         branch: /v\d+\.\d+\.\d+/
