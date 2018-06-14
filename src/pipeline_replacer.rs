@@ -8,10 +8,9 @@ use std::fs::{self, File};
 use std::io;
 use std::io::{Error, Write};
 use std::ops::Deref;
-use std::process;
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
-use util::{catch, decode_error};
+use util::{catch, decode_error, exit};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineReplacer
@@ -68,7 +67,7 @@ impl PipelineReplacer {
                     &format!("\nCleanup temporary file: {:?}\n", path),
                 );
                 let _ = fs::remove_file(path);
-                process::exit(0);
+                exit(0, &mut console);
             });
 
             {
@@ -143,11 +142,11 @@ impl PipelineReplacer {
                                 }
                                 "q" => {
                                     let _ = tmpfile.close();
-                                    process::exit(0)
+                                    exit(0, &mut self.console);
                                 }
                                 "quit" => {
                                     let _ = tmpfile.close();
-                                    process::exit(0)
+                                    exit(0, &mut self.console);
                                 }
                                 _ => continue,
                             }

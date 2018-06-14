@@ -14,11 +14,10 @@ use amber::pipeline_finder::PipelineFinder;
 use amber::pipeline_matcher::PipelineMatcher;
 use amber::pipeline_replacer::PipelineReplacer;
 use amber::pipeline_sorter::PipelineSorter;
-use amber::util::{decode_error, read_from_file, as_secsf64};
+use amber::util::{as_secsf64, decode_error, exit, read_from_file};
 use crossbeam_channel::unbounded;
 use std::cmp;
 use std::path::PathBuf;
-use std::process;
 use std::thread;
 use std::time::Duration;
 use structopt::{clap, StructOpt};
@@ -175,7 +174,7 @@ fn main() {
                     x
                 } else {
                     console.write(ConsoleTextKind::Error, &format!("Error: file is empty @ {:?}\n", f));
-                    process::exit(1);
+                    exit(1, &mut console);
                 }
             }
             Err(e) => {
@@ -183,7 +182,7 @@ fn main() {
                     ConsoleTextKind::Error,
                     &format!("Error: {} @ {:?}\n", decode_error(e.kind()), f),
                 );
-                process::exit(1);
+                exit(1, &mut console);
             }
         },
         None => opt.keyword.unwrap().clone().into_bytes(),
@@ -197,7 +196,7 @@ fn main() {
                     ConsoleTextKind::Error,
                     &format!("Error: {} @ {:?}\n", decode_error(e.kind()), f),
                 );
-                process::exit(1);
+                exit(1, &mut console);
             }
         },
         None => opt.replacement.unwrap().clone().into_bytes(),

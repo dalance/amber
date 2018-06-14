@@ -1,5 +1,7 @@
+use console::Console;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
+use std::process;
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -87,4 +89,10 @@ pub enum PipelineInfo<T> {
     Err(String),
     Time(Duration, Duration),
     End(usize),
+}
+
+pub fn exit(code: i32, console: &mut Console) -> ! {
+    console.reset();
+    console.flush();
+    process::exit(code);
 }
