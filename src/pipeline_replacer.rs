@@ -167,10 +167,12 @@ impl PipelineReplacer {
                 try!(tmpfile.flush());
             }
 
-            let metadata = try!(fs::metadata(&pm.path));
+            let real_path = try!(fs::canonicalize(&pm.path));
+
+            let metadata = try!(fs::metadata(&real_path));
 
             try!(fs::set_permissions(tmpfile.path(), metadata.permissions()));
-            try!(tmpfile.persist(&pm.path));
+            try!(tmpfile.persist(&real_path));
 
             Ok(())
         });
