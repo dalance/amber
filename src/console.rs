@@ -88,16 +88,12 @@ impl Console {
     }
 
     pub fn reset(&mut self) {
-        if self.colored_out {
-            self.term_stdout.reset().unwrap_or_else(|_| {
-                process::exit(1);
-            });
-        }
-        if self.colored_err {
-            self.term_stderr.reset().unwrap_or_else(|_| {
-                process::exit(1);
-            });
-        }
+        self.term_stdout.reset().unwrap_or_else(|_| {
+            process::exit(1);
+        });
+        self.term_stderr.reset().unwrap_or_else(|_| {
+            process::exit(1);
+        });
     }
 
     pub fn write_match_line(&mut self, src: &[u8], m: &Match) {

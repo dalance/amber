@@ -398,5 +398,5 @@ fn main() {
         );
     }
 
-    console.reset();
+    exit(0, &mut console);
 }
