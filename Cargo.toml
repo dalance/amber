@@ -29,6 +29,7 @@ statistics = []
 [dependencies]
 crossbeam-channel = "0.1.2"
 ctrlc             = "3.1.0"
+getch             = "0.2.0"
 glob              = "0.2.11"
 lazy_static       = "1.0.0"
 memmap            = "0.6.2"

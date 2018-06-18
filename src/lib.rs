@@ -2,6 +2,7 @@
 
 extern crate crossbeam_channel;
 extern crate ctrlc;
+extern crate getch;
 extern crate glob;
 extern crate memmap;
 extern crate num_cpus;

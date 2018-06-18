@@ -1,7 +1,7 @@
 use glob::{MatchOptions, Pattern};
 use std::fs::File;
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------------------------------------------------

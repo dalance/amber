@@ -1,11 +1,11 @@
 use console::{Console, ConsoleTextKind};
 use crossbeam_channel::{Receiver, Sender};
 use ctrlc;
+use getch::Getch;
 use memmap::Mmap;
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
 use std::fs::{self, File};
-use std::io;
 use std::io::{Error, Write};
 use std::ops::Deref;
 use std::time::{Duration, Instant};
@@ -113,38 +113,24 @@ impl PipelineReplacer {
                                 "Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):",
                             );
                             self.console.flush();
-                            let mut buf = String::new();
-                            io::stdin().read_line(&mut buf).unwrap();
-                            match buf.trim().to_lowercase().as_ref() {
-                                "y" => {
+                            let getch = Getch::new();
+                            let key = getch.getch()?;
+                            let key = char::from(key);
+                            self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
+                            match key.to_ascii_lowercase() {
+                                'y' => {
                                     do_replace = true;
                                     break;
                                 }
-                                "yes" => {
-                                    do_replace = true;
-                                    break;
-                                }
-                                "n" => {
+                                'n' => {
                                     do_replace = false;
                                     break;
                                 }
-                                "no" => {
-                                    do_replace = false;
-                                    break;
-                                }
-                                "a" => {
+                                'a' => {
                                     self.all_replace = true;
                                     break;
                                 }
-                                "all" => {
-                                    self.all_replace = true;
-                                    break;
-                                }
-                                "q" => {
-                                    let _ = tmpfile.close();
-                                    exit(0, &mut self.console);
-                                }
-                                "quit" => {
+                                'q' => {
                                     let _ = tmpfile.close();
                                     exit(0, &mut self.console);
                                 }
