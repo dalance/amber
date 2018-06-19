@@ -106,36 +106,23 @@ impl PipelineReplacer {
                         }
 
                         self.console.write_match_line(src, m);
-
-                        loop {
-                            self.console.write(
-                                ConsoleTextKind::Other,
-                                "Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):",
-                            );
-                            self.console.flush();
-                            let getch = Getch::new();
-                            let key = getch.getch()?;
-                            let key = char::from(key);
-                            self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
-                            match key.to_ascii_lowercase() {
-                                'y' => {
-                                    do_replace = true;
-                                    break;
-                                }
-                                'n' => {
-                                    do_replace = false;
-                                    break;
-                                }
-                                'a' => {
-                                    self.all_replace = true;
-                                    break;
-                                }
-                                'q' => {
-                                    let _ = tmpfile.close();
-                                    exit(0, &mut self.console);
-                                }
-                                _ => continue,
+                        self.console.write(
+                            ConsoleTextKind::Other,
+                            "Replace keyword? ( Yes[Y], No[n], All[a], Quit[q] ):",
+                        );
+                        self.console.flush();
+                        let getch = Getch::new();
+                        let key = getch.getch()?;
+                        let key = char::from(key);
+                        self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
+                        match key.to_ascii_lowercase() {
+                            'n' => do_replace = false,
+                            'a' => self.all_replace = true,
+                            'q' => {
+                                let _ = tmpfile.close();
+                                exit(0, &mut self.console);
                             }
+                            _ => do_replace = true,
                         }
                     }
 
