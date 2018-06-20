@@ -106,21 +106,29 @@ impl PipelineReplacer {
                         }
 
                         self.console.write_match_line(src, m);
-                        self.console
-                            .write(ConsoleTextKind::Other, "Replace keyword? [Y]es/[n]o/[a]ll/[q]uit:");
-                        self.console.flush();
+
                         let getch = Getch::new();
-                        let key = getch.getch()?;
-                        let key = char::from(key);
-                        self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
-                        match key {
-                            'N' | 'n' => do_replace = false,
-                            'A' | 'a' => self.all_replace = true,
-                            'Q' | 'q' => {
-                                let _ = tmpfile.close();
-                                exit(0, &mut self.console);
+                        loop {
+                            self.console
+                                .write(ConsoleTextKind::Other, "Replace keyword? [Y]es/[n]o/[a]ll/[q]uit: ");
+                            self.console.flush();
+                            let key = char::from(getch.getch()?);
+                            if key != '\n' {
+                                self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
+                            } else {
+                                self.console.write(ConsoleTextKind::Other, "\n");
                             }
-                            _ => do_replace = true,
+                            match key {
+                                'Y' | 'y' | ' ' | '\n' => do_replace = true,
+                                'N' | 'n' => do_replace = false,
+                                'A' | 'a' => self.all_replace = true,
+                                'Q' | 'q' => {
+                                    let _ = tmpfile.close();
+                                    exit(0, &mut self.console);
+                                }
+                                _ => continue,
+                            }
+                            break;
                         }
                     }
 
