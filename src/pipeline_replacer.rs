@@ -107,35 +107,28 @@ impl PipelineReplacer {
 
                         self.console.write_match_line(src, m);
 
+                        let getch = Getch::new();
                         loop {
-                            self.console.write(
-                                ConsoleTextKind::Other,
-                                "Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):",
-                            );
+                            self.console
+                                .write(ConsoleTextKind::Other, "Replace keyword? [Y]es/[n]o/[a]ll/[q]uit: ");
                             self.console.flush();
-                            let getch = Getch::new();
-                            let key = getch.getch()?;
-                            let key = char::from(key);
-                            self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
-                            match key.to_ascii_lowercase() {
-                                'y' => {
-                                    do_replace = true;
-                                    break;
-                                }
-                                'n' => {
-                                    do_replace = false;
-                                    break;
-                                }
-                                'a' => {
-                                    self.all_replace = true;
-                                    break;
-                                }
-                                'q' => {
+                            let key = char::from(getch.getch()?);
+                            if key != '\n' {
+                                self.console.write(ConsoleTextKind::Other, &format!("{}\n", key));
+                            } else {
+                                self.console.write(ConsoleTextKind::Other, "\n");
+                            }
+                            match key {
+                                'Y' | 'y' | ' ' | '\n' => do_replace = true,
+                                'N' | 'n' => do_replace = false,
+                                'A' | 'a' => self.all_replace = true,
+                                'Q' | 'q' => {
                                     let _ = tmpfile.close();
                                     exit(0, &mut self.console);
                                 }
                                 _ => continue,
                             }
+                            break;
                         }
                     }
 
