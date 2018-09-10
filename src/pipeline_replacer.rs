@@ -5,9 +5,11 @@ use getch::Getch;
 use memmap::Mmap;
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_matcher::PathMatch;
+use regex::Regex;
 use std::fs::{self, File};
 use std::io::{Error, Write};
 use std::ops::Deref;
+use std::str;
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use util::{catch, decode_error, exit};
@@ -26,13 +28,15 @@ pub struct PipelineReplacer {
     pub errors: Vec<String>,
     console: Console,
     all_replace: bool,
+    keyword: Vec<u8>,
     replacement: Vec<u8>,
+    regex: bool,
     time_beg: Instant,
     time_bsy: Duration,
 }
 
 impl PipelineReplacer {
-    pub fn new(replacement: &[u8]) -> Self {
+    pub fn new(keyword: &[u8], replacement: &[u8], regex: bool) -> Self {
         PipelineReplacer {
             is_color: true,
             is_interactive: true,
@@ -43,7 +47,9 @@ impl PipelineReplacer {
             errors: Vec::new(),
             console: Console::new(),
             all_replace: false,
+            keyword: Vec::from(keyword),
             replacement: Vec::from(replacement),
+            regex: regex,
             time_beg: Instant::now(),
             time_bsy: Duration::new(0, 0),
         }
@@ -133,7 +139,12 @@ impl PipelineReplacer {
                     }
 
                     if do_replace {
-                        try!(tmpfile.write_all(&self.replacement));
+                        if self.regex {
+                            let replacement = self.get_regex_replacement(&src[m.beg..m.end]);
+                            try!(tmpfile.write_all(&replacement));
+                        } else {
+                            try!(tmpfile.write_all(&self.replacement));
+                        }
                     } else {
                         try!(tmpfile.write_all(&src[m.beg..m.end]));
                     }
@@ -162,6 +173,20 @@ impl PipelineReplacer {
                 &format!("Error: {} @ {:?}\n", decode_error(e.kind()), pm.path),
             ),
         }
+    }
+
+    fn get_regex_replacement(&self, org: &[u8]) -> Vec<u8> {
+        // All unwrap() is safe bacause keyword is already matched in pipeline_matcher
+        let org = str::from_utf8(org).unwrap();
+        let keyword = str::from_utf8(&self.keyword).unwrap();
+        let replacement = str::from_utf8(&self.replacement).unwrap();
+        let regex = Regex::new(&keyword).unwrap();
+        let captures = regex.captures(&org).unwrap();
+
+        let mut dst = String::new();
+        captures.expand(&replacement, &mut dst);
+
+        dst.into_bytes()
     }
 }
 

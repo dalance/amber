@@ -222,7 +222,7 @@ fn main() {
 
     let mut finder = PipelineFinder::new();
     let mut sorter = PipelineSorter::new(matcher_num);
-    let mut replacer = PipelineReplacer::new(&replacement);
+    let mut replacer = PipelineReplacer::new(&keyword, &replacement, opt.regex);
 
     finder.is_recursive = !opt.no_recursive;
     finder.follow_symlink = !opt.no_symlink;

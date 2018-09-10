@@ -44,6 +44,16 @@ If you input 'y', 'Y', 'Yes', the keyword is replaced. 'a', 'A', 'All' means rep
 Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):
 ```
 
+If `--regex` option is enabled, regex captures can be used in `replacemant` of `ambr`.
+
+```
+$ cat text.txt
+aaa bbb
+$ ambr --no-interactive --regex '(aaa) (?<pat>bbb)' '$1 $pat ${1} ${pat}' test.txt
+$ cat text.txt
+aaa bbb aaa bbb
+```
+
 ## Benchmark
 
 ### Environment
