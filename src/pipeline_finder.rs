@@ -12,7 +12,6 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 pub struct PathInfo {
     pub path: PathBuf,
-    pub len: u64,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -73,7 +72,7 @@ impl PipelineFinder {
 
         if attr.is_file() {
             if attr.len() != 0 {
-                self.send_path(base, attr.len(), &tx);
+                self.send_path(base, &tx);
             }
         } else {
             let reader = match fs::read_dir(&base) {
@@ -97,16 +96,7 @@ impl PipelineFinder {
                             }
                         };
                         if file_type.is_file() {
-                            let metadata = match entry.metadata() {
-                                Ok(x) => x,
-                                Err(e) => {
-                                    self.errors.push(format!("Error: {}", e));
-                                    continue;
-                                }
-                            };
-                            if metadata.len() != 0 {
-                                self.send_path(entry.path(), metadata.len(), &tx);
-                            }
+                            self.send_path(entry.path(), &tx);
                         } else {
                             let find_dir = file_type.is_dir() & self.is_recursive;
                             let find_symlink = file_type.is_symlink() & self.is_recursive & self.follow_symlink;
@@ -123,9 +113,9 @@ impl PipelineFinder {
         }
     }
 
-    fn send_path(&mut self, path: PathBuf, len: u64, tx: &Vec<Sender<PipelineInfo<PathInfo>>>) {
+    fn send_path(&mut self, path: PathBuf, tx: &Vec<Sender<PipelineInfo<PathInfo>>>) {
         if self.check_path(&path, false) {
-            let _ = tx[self.current_tx].send(PipelineInfo::SeqDat(self.seq_no, PathInfo { path: path, len: len }));
+            let _ = tx[self.current_tx].send(PipelineInfo::SeqDat(self.seq_no, PathInfo { path: path }));
             self.seq_no += 1;
             self.current_tx = if self.current_tx == tx.len() - 1 {
                 0

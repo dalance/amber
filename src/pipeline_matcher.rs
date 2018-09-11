@@ -3,7 +3,7 @@ use matcher::{Match, Matcher};
 use memmap::Mmap;
 use pipeline::{Pipeline, PipelineInfo};
 use pipeline_finder::PathInfo;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{Error, Read};
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -57,9 +57,16 @@ impl<T: Matcher> PipelineMatcher<T> {
         let path_org = info.path.clone();
 
         let result = catch::<_, PathMatch, Error>(|| {
+            let attr = match fs::metadata(&info.path) {
+                Ok(x) => x,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
             let mmap;
             let mut buf = Vec::new();
-            let src = if info.len > self.mmap_bytes {
+            let src = if attr.len() > self.mmap_bytes {
                 let file = try!(File::open(&info.path));
                 mmap = try!(unsafe { Mmap::map(&file) });
                 mmap.deref()
