@@ -126,7 +126,7 @@ pub struct Opt {
 }
 
 lazy_static! {
-    static ref MAX_THREADS: String = format!("{}", cmp::min(4, num_cpus::get()));
+    static ref MAX_THREADS: String = format!("{}", num_cpus::get());
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn main() {
     let id_printer = 2;
     let id_matcher = 3;
 
-    let matcher_num = opt.max_threads;
+    let matcher_num = cmp::min(8, opt.max_threads);
 
     let (tx_finder, rx_finder) = unbounded();
     let (tx_printer, rx_printer) = unbounded();
