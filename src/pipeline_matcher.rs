@@ -203,21 +203,18 @@ mod tests {
             0,
             PathInfo {
                 path: PathBuf::from("./src/ambs.rs"),
-                len: 1,
             },
         ));
         let _ = in_tx.send(PipelineInfo::SeqDat(
             1,
             PathInfo {
                 path: PathBuf::from("./src/ambr.rs"),
-                len: 1,
             },
         ));
         let _ = in_tx.send(PipelineInfo::SeqDat(
             2,
             PathInfo {
                 path: PathBuf::from("./src/util.rs"),
-                len: 1,
             },
         ));
         let _ = in_tx.send(PipelineInfo::SeqEnd(3));
