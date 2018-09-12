@@ -63,10 +63,12 @@ aaa bbb aaa bbb
 - MEM: 1.5TB
 - OS : CentOS 7.5
 
-### Pattern
+### Target Data
 
 - source1: https://github.com/torvalds/linux ( 52998files, 2.2GB )
 - source2: https://dumps.wikimedia.org/jawiki/latest/jawiki-latest-pages-articles.xml.bz2 ( 1file, 8.5GB )
+
+### Pattern
 
 - pattern1( many files with many matches ) : 'EXPORT_SYMBOL_GPL' in source1
 - pattern2( many files with few matches  ) : 'irq_bypass_register_producer' in source1
