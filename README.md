@@ -58,26 +58,51 @@ aaa bbb aaa bbb
 ## Benchmark
 
 ### Environment
-- CPU: Xeon E5-2690 @ 2.90GHz
-- MEM: 256GB
-- OS : CentOS 7.2
 
-### Data
+- CPU: Intel(R) Xeon(R) Gold 6134 CPU @ 3.20GHz
+- MEM: 1.5TB
+- OS : CentOS 7.5
+
+### Pattern
+
 - source1: https://github.com/torvalds/linux ( 52998files, 2.2GB )
 - source2: https://dumps.wikimedia.org/jawiki/latest/jawiki-latest-pages-articles.xml.bz2 ( 1file, 8.5GB )
 
+- pattern1( many files with many matches ) : 'EXPORT_SYMBOL_GPL' in source1
+- pattern2( many files with few matches  ) : 'irq_bypass_register_producer' in source1
+- pattern3( a large file with many matches ) : '検索結果' in source2
+- pattern4( a large file with few matches  ) : '"Quick Search"' in source2
+
+### Comparison Tools
+
+- amber (v0.5.1)
+- [ripgrep](https://github.com/BurntSushi/ripgrep) (v0.10.0)
+- [grep](https://www.gnu.org/software/grep/) (v2.20)
+- [fastmod](https://github.com/facebookincubator/fastmod) (v0.2.0)
+- [find](https://www.gnu.org/software/findutils/)/[sed](https://www.gnu.org/software/sed/) (v4.5.11/v4.2.2)
+
+### Benchmarking Tool
+
+[hyperfine](https://github.com/sharkdp/hyperfine) with the following options.
+
+- `--warmup 3`: to load all data on memory.
+
 ### Result
 
-```
-grep --color=auto -r EXPORT_SYMBOL_GPL ./data/linux  0.27s user 0.41s system  37% cpu 1.825 total
-ag   --nogroup       EXPORT_SYMBOL_GPL ./data/linux  1.19s user 2.84s system 167% cpu 2.404 total
-pt   --nogroup       EXPORT_SYMBOL_GPL ./data/linux  3.37s user 0.94s system 228% cpu 1.883 total
-ambs                 EXPORT_SYMBOL_GPL ./data/linux  2.55s user 0.81s system 179% cpu 1.872 total
-```
+- search ( `compare_ambs.sh` )
 
-```
-grep --color=auto -r "Quick Search" ./data/jawiki-latest-pages-articles.xml   0.82s user  1.68s system   99% cpu  2.495 total
-ag   --nogroup       "Quick Search" ./data/jawiki-latest-pages-articles.xml  15.38s user  0.89s system  100% cpu 16.265 total
-pt   --nogroup       "Quick Search" ./data/jawiki-latest-pages-articles.xml  12.49s user  1.13s system  100% cpu 13.548 total
-ambs                 "Quick Search" ./data/jawiki-latest-pages-articles.xml   5.83s user 10.82s system 2304% cpu  0.723 total
-```
+| pattern | amber            | ripgrep          | grep             |
+| ------- | ---------------- | ---------------- | ---------------- |
+| 1       | 212.8ms ( 139% ) | 154.1ms ( 100% ) | 685.2ms ( 448% ) |
+| 2       | 199.7ms ( 132% ) | 151.6ms ( 100% ) | 678.7ms ( 448% ) |
+| 3       | 1.068s  ( 100% ) | 4.642s  ( 434% ) | 3.869s  ( 362% ) |
+| 4       | 1.027s  ( 100% ) | 4.409s  ( 429% ) | 3.118s  ( 304% ) |
+
+- replace ( `compare_ambr.sh` )
+
+| pattern | amber            | fastmod          | find/sed            |
+| ------- | ---------------- | ---------------- | ------------------- |
+| 1       | 792.2ms ( 100% ) | 1231ms  ( 155% ) | 155724ms ( 19657% ) |
+| 2       | 418.1ms ( 119% ) | 352.4ms ( 100% ) | 157396ms ( 44663% ) |
+| 3       | 18.390s ( 100% ) | 74.282s ( 404% ) | 639.740s ( 3479% )  |
+| 4       | 17.777s ( 100% ) | 74.204s ( 417% ) | 625.756s ( 3520% )  |
