@@ -28,6 +28,7 @@ You can decide to do replacing or not interactively.
 
 ### Arch Linux
 Install the `amber-search-git` package from AUR.
+
 ```yaourt -S amber-search-git```
 
 ### Manual
