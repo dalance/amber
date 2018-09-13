@@ -13,7 +13,7 @@ This tool is inspired by [ack](http://beyondgrep.com/),
 
 ### Useful default settings
 - Recursively search from the current directory
-- Ignore vcs directories (.git, .hg, .svn, .bzr)
+- Ignore VCS directories (.git, .hg, .svn, .bzr)
 - Ignore binary files
 - Output by the colored format
 
@@ -21,10 +21,16 @@ This tool is inspired by [ack](http://beyondgrep.com/),
 Large files ( > 1MB by default) are divided and searched in parallel.
 
 ### Interactive replacing
-**amber** can replace a keyword over directories (traditionally by `find ... | xargs sed -i '...'`) . 
+**amber** can replace a keyword over directories (traditionally by `find ... | xargs sed -i '...'`) .
 You can decide to do replacing or not interactively.
 
 ## Install
+
+### Arch Linux
+Install the `amber-search-git` package from AUR.
+```yaourt -S amber-search-git```
+
+### Manual
 Download from [release page](https://github.com/dalance/amber/releases/latest), and extract to the directory in PATH.
 
 ## Usage
@@ -45,7 +51,7 @@ If you input 'y', 'Y', 'Yes', the keyword is replaced. 'a', 'A', 'All' means rep
 Replace keyword? ( Yes[Y], No[N], All[A], Quit[Q] ):
 ```
 
-If `--regex` option is enabled, regex captures can be used in `replacemant` of `ambr`.
+If `--regex` option is enabled, regex captures can be used in `replacement` of `ambr`.
 
 ```
 $ cat text.txt
