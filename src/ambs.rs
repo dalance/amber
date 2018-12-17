@@ -1,12 +1,3 @@
-extern crate amber;
-extern crate crossbeam_channel;
-#[macro_use]
-extern crate lazy_static;
-extern crate num_cpus;
-extern crate rustc_serialize;
-#[macro_use]
-extern crate structopt;
-
 use amber::console::{Console, ConsoleTextKind};
 use amber::matcher::{QuickSearchMatcher, RegexMatcher, TbmMatcher};
 use amber::pipeline::{Pipeline, PipelineFork, PipelineInfo, PipelineJoin};
@@ -16,6 +7,7 @@ use amber::pipeline_printer::PipelinePrinter;
 use amber::pipeline_sorter::PipelineSorter;
 use amber::util::{as_secsf64, decode_error, exit, read_from_file};
 use crossbeam_channel::unbounded;
+use lazy_static::lazy_static;
 use std::cmp;
 use std::path::PathBuf;
 use std::thread;

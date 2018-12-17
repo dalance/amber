@@ -1,6 +1,6 @@
 extern crate term;
 
-use matcher::Match;
+use crate::matcher::Match;
 use std::io;
 use std::io::Write;
 use std::process;

@@ -1,14 +1,14 @@
+use crate::matcher::{Match, Matcher};
+use crate::pipeline::{Pipeline, PipelineInfo};
+use crate::pipeline_finder::PathInfo;
+use crate::util::{catch, decode_error};
 use crossbeam_channel::{Receiver, Sender};
-use matcher::{Match, Matcher};
 use memmap::Mmap;
-use pipeline::{Pipeline, PipelineInfo};
-use pipeline_finder::PathInfo;
 use std::fs::{self, File};
 use std::io::{Error, Read};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use util::{catch, decode_error};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PathMatch
@@ -67,12 +67,12 @@ impl<T: Matcher> PipelineMatcher<T> {
             let mmap;
             let mut buf = Vec::new();
             let src = if attr.len() > self.mmap_bytes {
-                let file = try!(File::open(&info.path));
-                mmap = try!(unsafe { Mmap::map(&file) });
+                let file = File::open(&info.path)?;
+                mmap = unsafe { Mmap::map(&file) }?;
                 mmap.deref()
             } else {
-                let mut f = try!(File::open(&info.path));
-                try!(f.read_to_end(&mut buf));
+                let mut f = File::open(&info.path)?;
+                f.read_to_end(&mut buf)?;
                 &buf[..]
             };
 
@@ -180,10 +180,10 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::matcher::QuickSearchMatcher;
+    use crate::pipeline::{Pipeline, PipelineInfo};
+    use crate::pipeline_finder::PathInfo;
     use crossbeam_channel::unbounded;
-    use matcher::QuickSearchMatcher;
-    use pipeline::{Pipeline, PipelineInfo};
-    use pipeline_finder::PathInfo;
     use std::path::PathBuf;
     use std::thread;
 

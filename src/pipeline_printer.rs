@@ -1,13 +1,13 @@
-use console::{Console, ConsoleTextKind};
+use crate::console::{Console, ConsoleTextKind};
+use crate::pipeline::{Pipeline, PipelineInfo};
+use crate::pipeline_matcher::PathMatch;
+use crate::util::{catch, decode_error};
 use crossbeam_channel::{Receiver, Sender};
 use memmap::Mmap;
-use pipeline::{Pipeline, PipelineInfo};
-use pipeline_matcher::PathMatch;
 use std::fs::File;
 use std::io::Error;
 use std::ops::Deref;
 use std::time::{Duration, Instant};
-use util::{catch, decode_error};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelinePrinter
@@ -47,8 +47,8 @@ impl PipelinePrinter {
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error>(|| {
-            let file = try!(File::open(&pm.path));
-            let mmap = try!(unsafe { Mmap::map(&file) });
+            let file = File::open(&pm.path)?;
+            let mmap = unsafe { Mmap::map(&file) }?;
             let src = mmap.deref();
 
             let mut pos = 0;

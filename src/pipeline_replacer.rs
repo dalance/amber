@@ -1,10 +1,11 @@
-use console::{Console, ConsoleTextKind};
+use crate::console::{Console, ConsoleTextKind};
+use crate::pipeline::{Pipeline, PipelineInfo};
+use crate::pipeline_matcher::PathMatch;
+use crate::util::{catch, decode_error, exit};
 use crossbeam_channel::{Receiver, Sender};
 use ctrlc;
 use getch::Getch;
 use memmap::Mmap;
-use pipeline::{Pipeline, PipelineInfo};
-use pipeline_matcher::PathMatch;
 use regex::Regex;
 use std::fs::{self, File};
 use std::io::{Error, Write};
@@ -12,7 +13,6 @@ use std::ops::Deref;
 use std::str;
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
-use util::{catch, decode_error, exit};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineReplacer
@@ -62,7 +62,7 @@ impl PipelineReplacer {
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error>(|| {
-            let mut tmpfile = try!(NamedTempFile::new_in(pm.path.parent().unwrap_or(&pm.path)));
+            let mut tmpfile = NamedTempFile::new_in(pm.path.parent().unwrap_or(&pm.path))?;
 
             let tmpfile_path = tmpfile.path().to_path_buf();
             let _ = ctrlc::set_handler(move || {
@@ -77,8 +77,8 @@ impl PipelineReplacer {
             });
 
             {
-                let file = try!(File::open(&pm.path));
-                let mmap = try!(unsafe { Mmap::map(&file) });
+                let file = File::open(&pm.path)?;
+                let mmap = unsafe { Mmap::map(&file) }?;
                 let src = mmap.deref();
 
                 let mut i = 0;
@@ -86,7 +86,7 @@ impl PipelineReplacer {
                 let mut column = 0;
                 let mut last_lf = 0;
                 for m in &pm.matches {
-                    try!(tmpfile.write_all(&src[i..m.beg]));
+                    tmpfile.write_all(&src[i..m.beg])?;
 
                     let mut do_replace = true;
                     if self.is_interactive & !self.all_replace {
@@ -141,28 +141,28 @@ impl PipelineReplacer {
                     if do_replace {
                         if self.regex {
                             let replacement = self.get_regex_replacement(&src[m.beg..m.end]);
-                            try!(tmpfile.write_all(&replacement));
+                            tmpfile.write_all(&replacement)?;
                         } else {
-                            try!(tmpfile.write_all(&self.replacement));
+                            tmpfile.write_all(&self.replacement)?;
                         }
                     } else {
-                        try!(tmpfile.write_all(&src[m.beg..m.end]));
+                        tmpfile.write_all(&src[m.beg..m.end])?;
                     }
                     i = m.end;
                 }
 
                 if i < src.len() {
-                    try!(tmpfile.write_all(&src[i..src.len()]));
+                    tmpfile.write_all(&src[i..src.len()])?;
                 }
-                try!(tmpfile.flush());
+                tmpfile.flush()?;
             }
 
-            let real_path = try!(fs::canonicalize(&pm.path));
+            let real_path = fs::canonicalize(&pm.path)?;
 
-            let metadata = try!(fs::metadata(&real_path));
+            let metadata = fs::metadata(&real_path)?;
 
-            try!(fs::set_permissions(tmpfile.path(), metadata.permissions()));
-            try!(tmpfile.persist(&real_path));
+            fs::set_permissions(tmpfile.path(), metadata.permissions())?;
+            tmpfile.persist(&real_path)?;
 
             Ok(())
         });

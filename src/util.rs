@@ -1,4 +1,4 @@
-use console::Console;
+use crate::console::Console;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::process;

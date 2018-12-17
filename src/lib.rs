@@ -1,19 +1,5 @@
 #![cfg_attr(feature = "sse", feature(asm))]
 
-extern crate crossbeam_channel;
-extern crate ctrlc;
-extern crate getch;
-extern crate glob;
-extern crate memmap;
-extern crate num_cpus;
-extern crate rand;
-extern crate regex;
-extern crate rlibc;
-extern crate rustc_serialize;
-extern crate scoped_threadpool;
-extern crate tempfile;
-extern crate term;
-
 #[macro_use]
 pub mod util;
 pub mod console;

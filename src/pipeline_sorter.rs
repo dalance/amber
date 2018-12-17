@@ -1,6 +1,6 @@
+use crate::pipeline::{PipelineInfo, PipelineJoin};
+use crate::pipeline_matcher::PathMatch;
 use crossbeam_channel::{Receiver, Sender};
-use pipeline::{PipelineInfo, PipelineJoin};
-use pipeline_matcher::PathMatch;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -115,9 +115,9 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pipeline::{PipelineInfo, PipelineJoin};
+    use crate::pipeline_matcher::PathMatch;
     use crossbeam_channel::unbounded;
-    use pipeline::{PipelineInfo, PipelineJoin};
-    use pipeline_matcher::PathMatch;
     use std::path::PathBuf;
     use std::thread;
 

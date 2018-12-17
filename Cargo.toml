@@ -8,6 +8,7 @@ categories = ["command-line-utilities", "development-tools"]
 license = "MIT"
 readme = "README.md"
 description = "A code search and replace tool"
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "dalance/amber" }
