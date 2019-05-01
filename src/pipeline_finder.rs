@@ -276,7 +276,7 @@ mod tests {
     use super::*;
     use crate::pipeline::{PipelineFork, PipelineInfo};
     use crossbeam_channel::unbounded;
-    use std::path::PathBuf;
+    use std::path::{Path,PathBuf};
     use std::thread;
 
     fn test<T: 'static + PipelineFork<PathBuf, PathInfo> + Send>(mut finder: T, path: String) -> Vec<PathInfo> {
@@ -303,6 +303,11 @@ mod tests {
 
     #[test]
     fn pipeline_finder_default() {
+        if !Path::new("./.git/config").exists() {
+            fs::create_dir_all("./.git").unwrap();
+            fs::File::create("./.git/config").unwrap();
+        }
+
         let finder = PipelineFinder::new();
         let ret = test(finder, "./".to_string());
 
@@ -318,6 +323,11 @@ mod tests {
 
     #[test]
     fn pipeline_finder_not_skip_vcs() {
+        if !Path::new("./.git/config").exists() {
+            fs::create_dir_all("./.git").unwrap();
+            fs::File::create("./.git/config").unwrap();
+        }
+
         let mut finder = PipelineFinder::new();
         finder.skip_vcs = false;
         let ret = test(finder, "./".to_string());
