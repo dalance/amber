@@ -44,6 +44,7 @@ structopt         = "0.2.8"
 tempfile          = "3.0.2"
 term              = "0.5.1"
 time              = "0.1.40"
+unicode-width     = "0.1.6"
 
 [profile.dev]
 opt-level        = 0

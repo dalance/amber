@@ -129,6 +129,39 @@ impl Console {
         self.write(ConsoleTextKind::Text, "\n");
     }
 
+    pub fn write_replace_line(&mut self, src: &[u8], m: &Match, rep: &[u8]) {
+        let mut beg = m.beg;
+        let mut end = m.end;
+        while beg > 0 {
+            if src[beg] == 0x0d || src[beg] == 0x0a {
+                beg += 1;
+                break;
+            }
+            beg -= 1;
+        }
+        while src.len() > end {
+            if src[end] == 0x0d || src[end] == 0x0a {
+                end -= 1;
+                break;
+            }
+            end += 1;
+        }
+        if src.len() <= end {
+            end = src.len()
+        } else {
+            end += 1
+        };
+
+        if beg < m.beg {
+            self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..m.beg]));
+        }
+        self.write(ConsoleTextKind::MatchText, &String::from_utf8_lossy(&rep));
+        if m.end < end {
+            self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[m.end..end]));
+        }
+        self.write(ConsoleTextKind::Text, "\n");
+    }
+
     fn write_stdout(&mut self, val: &str, color: Color) {
         if self.is_color {
             if self.color_out != color {
