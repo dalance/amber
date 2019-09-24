@@ -13,6 +13,7 @@ use std::ops::Deref;
 use std::str;
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
+use unicode_width::UnicodeWidthStr;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // PipelineReplacer
@@ -88,10 +89,19 @@ impl PipelineReplacer {
                 for m in &pm.matches {
                     tmpfile.write_all(&src[i..m.beg])?;
 
+                    let replacement = if self.regex {
+                        self.get_regex_replacement(&src[m.beg..m.end])
+                    } else {
+                        self.replacement.clone()
+                    };
+
                     let mut do_replace = true;
                     if self.is_interactive & !self.all_replace {
+                        let mut header_witdh = 0;
                         if self.print_file {
-                            self.console.write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
+                            let path = pm.path.to_str().unwrap();
+                            header_witdh += UnicodeWidthStr::width(path) + 2;
+                            self.console.write(ConsoleTextKind::Filename, path);
                             self.console.write(ConsoleTextKind::Other, ": ");
                         }
                         if self.print_column | self.print_row {
@@ -103,15 +113,27 @@ impl PipelineReplacer {
                                 pos += 1;
                             }
                             if self.print_column {
-                                self.console.write(ConsoleTextKind::Other, &format!("{}:", column + 1));
+                                let column_str = format!("{}:", column + 1);
+                                header_witdh += column_str.width();
+                                self.console.write(ConsoleTextKind::Other, &column_str);
                             }
                             if self.print_row {
-                                self.console
-                                    .write(ConsoleTextKind::Other, &format!("{}:", m.beg - last_lf));
+                                let row_str = format!("{}:", m.beg - last_lf);
+                                header_witdh += row_str.width();
+                                self.console.write(ConsoleTextKind::Other, &row_str);
                             }
                         }
 
+                        if header_witdh < 4 {
+                            self.console
+                                .write(ConsoleTextKind::Other, &format!("{}", " ".repeat(4 - header_witdh)));
+                            header_witdh = 4;
+                        }
+
                         self.console.write_match_line(src, m);
+                        self.console
+                            .write(ConsoleTextKind::Other, &format!("{} -> ", " ".repeat(header_witdh - 4)));
+                        self.console.write_replace_line(src, m, &replacement);
 
                         let getch = Getch::new();
                         loop {
@@ -139,12 +161,7 @@ impl PipelineReplacer {
                     }
 
                     if do_replace {
-                        if self.regex {
-                            let replacement = self.get_regex_replacement(&src[m.beg..m.end]);
-                            tmpfile.write_all(&replacement)?;
-                        } else {
-                            tmpfile.write_all(&self.replacement)?;
-                        }
+                        tmpfile.write_all(&replacement)?;
                     } else {
                         tmpfile.write_all(&src[m.beg..m.end])?;
                     }
