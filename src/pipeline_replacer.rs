@@ -125,7 +125,7 @@ impl PipelineReplacer {
                                 self.console.write(ConsoleTextKind::Other, "\n");
                             }
                             match key {
-                                'Y' | 'y' | ' ' | '\n' => do_replace = true,
+                                'Y' | 'y' | ' ' | '\r' | '\n' => do_replace = true,
                                 'N' | 'n' => do_replace = false,
                                 'A' | 'a' => self.all_replace = true,
                                 'Q' | 'q' => {
