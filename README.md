@@ -62,6 +62,35 @@ $ cat text.txt
 aaa bbb aaa bbb
 ```
 
+## Configuration
+
+Default flags can be configured by `~/.ambs.toml` and `~/.ambr.toml`.
+Available entries and default values are below:
+
+```toml
+regex          = false
+column         = false
+row            = false
+binary         = false
+statistics     = false
+skipped        = false
+interactive    = true
+recursive      = true
+symlink        = true
+color          = true
+file           = true
+skip_vcs       = true
+skip_gitignore = true
+fixed_order    = true
+parent_ignore  = true
+```
+
+You can choose some entries to override like below:
+
+```toml
+column = true
+```
+
 ## Benchmark
 
 ### Environment

@@ -7,8 +7,12 @@ use amber::pipeline_replacer::PipelineReplacer;
 use amber::pipeline_sorter::PipelineSorter;
 use amber::util::{as_secsf64, decode_error, exit, read_from_file};
 use crossbeam_channel::unbounded;
+use dirs;
 use lazy_static::lazy_static;
+use serde_derive::Deserialize;
 use std::cmp;
+use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -61,63 +65,123 @@ pub struct Opt {
     pub mmap_bytes: u64,
 
     /// Enable regular expression search
-    #[structopt(long = "regex")]
+    #[structopt(long = "regex", raw(hidden = "DEFAULT_FLAGS.regex"))]
     pub regex: bool,
 
     /// Enable column output
-    #[structopt(long = "column")]
+    #[structopt(long = "column", raw(hidden = "DEFAULT_FLAGS.column"))]
     pub column: bool,
 
     /// Enable row output
-    #[structopt(long = "row")]
+    #[structopt(long = "row", raw(hidden = "DEFAULT_FLAGS.row"))]
     pub row: bool,
 
     /// Enable binary file search
-    #[structopt(long = "binary")]
+    #[structopt(long = "binary", raw(hidden = "DEFAULT_FLAGS.binary"))]
     pub binary: bool,
 
     /// Enable statistics output
-    #[structopt(long = "statistics")]
+    #[structopt(long = "statistics", raw(hidden = "DEFAULT_FLAGS.statistics"))]
     pub statistics: bool,
 
     /// Enable skipped file output
-    #[structopt(long = "skipped")]
+    #[structopt(long = "skipped", raw(hidden = "DEFAULT_FLAGS.skipped"))]
     pub skipped: bool,
 
+    /// Enable interactive replace
+    #[structopt(long = "interactive", raw(hidden = "DEFAULT_FLAGS.interactive"))]
+    pub interactive: bool,
+
+    /// Enable recursive directory search
+    #[structopt(long = "recursive", raw(hidden = "DEFAULT_FLAGS.recursive"))]
+    pub recursive: bool,
+
+    /// Enable symbolic link follow
+    #[structopt(long = "symlink", raw(hidden = "DEFAULT_FLAGS.symlink"))]
+    pub symlink: bool,
+
+    /// Enable colored output
+    #[structopt(long = "color", raw(hidden = "DEFAULT_FLAGS.color"))]
+    pub color: bool,
+
+    /// Enable filename output
+    #[structopt(long = "file", raw(hidden = "DEFAULT_FLAGS.file"))]
+    pub file: bool,
+
+    /// Enable vcs directory ( .hg/.git/.svn ) skip
+    #[structopt(long = "skip-vcs", raw(hidden = "DEFAULT_FLAGS.skip_vcs"))]
+    pub skip_vcs: bool,
+
+    /// Enable .gitignore skip
+    #[structopt(long = "skip-gitignore", raw(hidden = "DEFAULT_FLAGS.skip_gitignore"))]
+    pub skip_gitignore: bool,
+
+    /// Enable output order guarantee
+    #[structopt(long = "fixed-order", raw(hidden = "DEFAULT_FLAGS.fixed_order"))]
+    pub fixed_order: bool,
+
+    /// Enable .*ignore file search at parent directories
+    #[structopt(long = "parent-ignore", raw(hidden = "DEFAULT_FLAGS.parent_ignore"))]
+    pub parent_ignore: bool,
+
+    /// Disable regular expression search
+    #[structopt(long = "no-regex", raw(hidden = "!DEFAULT_FLAGS.regex"))]
+    pub no_regex: bool,
+
+    /// Disable column output
+    #[structopt(long = "no-column", raw(hidden = "!DEFAULT_FLAGS.column"))]
+    pub no_column: bool,
+
+    /// Disable row output
+    #[structopt(long = "no-row", raw(hidden = "!DEFAULT_FLAGS.row"))]
+    pub no_row: bool,
+
+    /// Disable binary file search
+    #[structopt(long = "no-binary", raw(hidden = "!DEFAULT_FLAGS.binary"))]
+    pub no_binary: bool,
+
+    /// Disable statistics output
+    #[structopt(long = "no-statistics", raw(hidden = "!DEFAULT_FLAGS.statistics"))]
+    pub no_statistics: bool,
+
+    /// Disable skipped file output
+    #[structopt(long = "no-skipped", raw(hidden = "!DEFAULT_FLAGS.skipped"))]
+    pub no_skipped: bool,
+
     /// Disable interactive replace
-    #[structopt(long = "no-interactive")]
+    #[structopt(long = "no-interactive", raw(hidden = "!DEFAULT_FLAGS.interactive"))]
     pub no_interactive: bool,
 
     /// Disable recursive directory search
-    #[structopt(long = "no-recursive")]
+    #[structopt(long = "no-recursive", raw(hidden = "!DEFAULT_FLAGS.recursive"))]
     pub no_recursive: bool,
 
     /// Disable symbolic link follow
-    #[structopt(long = "no-symlink")]
+    #[structopt(long = "no-symlink", raw(hidden = "!DEFAULT_FLAGS.symlink"))]
     pub no_symlink: bool,
 
     /// Disable colored output
-    #[structopt(long = "no-color")]
+    #[structopt(long = "no-color", raw(hidden = "!DEFAULT_FLAGS.color"))]
     pub no_color: bool,
 
     /// Disable filename output
-    #[structopt(long = "no-file")]
+    #[structopt(long = "no-file", raw(hidden = "!DEFAULT_FLAGS.file"))]
     pub no_file: bool,
 
     /// Disable vcs directory ( .hg/.git/.svn ) skip
-    #[structopt(long = "no-skip-vcs")]
+    #[structopt(long = "no-skip-vcs", raw(hidden = "!DEFAULT_FLAGS.skip_vcs"))]
     pub no_skip_vcs: bool,
 
     /// Disable .gitignore skip
-    #[structopt(long = "no-skip-gitignore")]
+    #[structopt(long = "no-skip-gitignore", raw(hidden = "!DEFAULT_FLAGS.skip_gitignore"))]
     pub no_skip_gitignore: bool,
 
     /// Disable output order guarantee
-    #[structopt(long = "no-fixed-order")]
+    #[structopt(long = "no-fixed-order", raw(hidden = "!DEFAULT_FLAGS.fixed_order"))]
     pub no_fixed_order: bool,
 
     /// Disable .*ignore file search at parent directories
-    #[structopt(long = "no-parent-ignore")]
+    #[structopt(long = "no-parent-ignore", raw(hidden = "!DEFAULT_FLAGS.parent_ignore"))]
     pub no_parent_ignore: bool,
 
     /// [Experimental] Enable TBM matcher
@@ -129,8 +193,123 @@ pub struct Opt {
     pub sse: bool,
 }
 
+#[derive(Debug, Deserialize)]
+struct DefaultFlags {
+    #[serde(default = "flag_false")]
+    regex: bool,
+    #[serde(default = "flag_false")]
+    column: bool,
+    #[serde(default = "flag_false")]
+    row: bool,
+    #[serde(default = "flag_false")]
+    binary: bool,
+    #[serde(default = "flag_false")]
+    statistics: bool,
+    #[serde(default = "flag_false")]
+    skipped: bool,
+    #[serde(default = "flag_true")]
+    interactive: bool,
+    #[serde(default = "flag_true")]
+    recursive: bool,
+    #[serde(default = "flag_true")]
+    symlink: bool,
+    #[serde(default = "flag_true")]
+    color: bool,
+    #[serde(default = "flag_true")]
+    file: bool,
+    #[serde(default = "flag_true")]
+    skip_vcs: bool,
+    #[serde(default = "flag_true")]
+    skip_gitignore: bool,
+    #[serde(default = "flag_true")]
+    fixed_order: bool,
+    #[serde(default = "flag_true")]
+    parent_ignore: bool,
+}
+
+impl DefaultFlags {
+    fn new() -> DefaultFlags {
+        toml::from_str("").unwrap()
+    }
+
+    fn load() -> DefaultFlags {
+        match dirs::home_dir() {
+            Some(mut path) => {
+                path.push(".ambr.toml");
+                if path.exists() {
+                    match fs::File::open(&path) {
+                        Ok(mut f) => {
+                            let mut s = String::new();
+                            let _ = f.read_to_string(&mut s);
+                            match toml::from_str(&s) {
+                                Ok(x) => x,
+                                Err(_) => DefaultFlags::new(),
+                            }
+                        }
+                        Err(_) => DefaultFlags::new(),
+                    }
+                } else {
+                    DefaultFlags::new()
+                }
+            }
+            None => DefaultFlags::new(),
+        }
+    }
+
+    fn merge(&self, mut opt: Opt) -> Opt {
+        opt.regex = if self.regex { !opt.no_regex } else { opt.regex };
+        opt.column = if self.column { !opt.no_column } else { opt.column };
+        opt.row = if self.row { !opt.no_row } else { opt.row };
+        opt.binary = if self.binary { !opt.no_binary } else { opt.binary };
+        opt.statistics = if self.statistics {
+            !opt.no_statistics
+        } else {
+            opt.statistics
+        };
+        opt.skipped = if self.skipped { !opt.no_skipped } else { opt.skipped };
+        opt.interactive = if self.interactive {
+            !opt.no_interactive
+        } else {
+            opt.interactive
+        };
+        opt.recursive = if self.recursive {
+            !opt.no_recursive
+        } else {
+            opt.recursive
+        };
+        opt.symlink = if self.symlink { !opt.no_symlink } else { opt.symlink };
+        opt.color = if self.color { !opt.no_color } else { opt.color };
+        opt.file = if self.file { !opt.no_file } else { opt.file };
+        opt.skip_vcs = if self.skip_vcs { !opt.no_skip_vcs } else { opt.skip_vcs };
+        opt.skip_gitignore = if self.skip_gitignore {
+            !opt.no_skip_gitignore
+        } else {
+            opt.skip_gitignore
+        };
+        opt.fixed_order = if self.fixed_order {
+            !opt.no_fixed_order
+        } else {
+            opt.fixed_order
+        };
+        opt.parent_ignore = if self.parent_ignore {
+            !opt.no_parent_ignore
+        } else {
+            opt.parent_ignore
+        };
+        opt
+    }
+}
+
+fn flag_true() -> bool {
+    true
+}
+fn flag_false() -> bool {
+    false
+}
+
 lazy_static! {
     static ref MAX_THREADS: String = format!("{}", num_cpus::get());
+    static ref DEFAULT_FLAGS: DefaultFlags = DefaultFlags::load();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -145,9 +324,10 @@ fn main() {
     // - Create opt ------------------------------------------------------------
 
     let opt = Opt::from_args();
+    let opt = DEFAULT_FLAGS.merge(opt);
 
     let mut console = Console::new();
-    console.is_color = !opt.no_color;
+    console.is_color = opt.color;
 
     // - Set base path, keyword and replacement --------------------------------
     let mut base_paths: Vec<PathBuf> = Vec::new();
@@ -216,16 +396,16 @@ fn main() {
     let mut sorter = PipelineSorter::new(matcher_num);
     let mut replacer = PipelineReplacer::new(&keyword, &replacement, opt.regex);
 
-    finder.is_recursive = !opt.no_recursive;
-    finder.follow_symlink = !opt.no_symlink;
-    finder.skip_vcs = !opt.no_skip_vcs;
-    finder.skip_gitignore = !opt.no_skip_gitignore;
+    finder.is_recursive = opt.recursive;
+    finder.follow_symlink = opt.symlink;
+    finder.skip_vcs = opt.skip_vcs;
+    finder.skip_gitignore = opt.skip_gitignore;
     finder.print_skipped = opt.skipped;
-    finder.find_parent_ignore = !opt.no_parent_ignore;
-    sorter.through = opt.no_fixed_order;
-    replacer.is_color = !opt.no_color;
-    replacer.is_interactive = !opt.no_interactive;
-    replacer.print_file = !opt.no_file;
+    finder.find_parent_ignore = opt.parent_ignore;
+    sorter.through = !opt.fixed_order;
+    replacer.is_color = opt.color;
+    replacer.is_interactive = opt.interactive;
+    replacer.print_file = opt.file;
     replacer.print_column = opt.column;
     replacer.print_row = opt.row;
 

@@ -30,6 +30,7 @@ statistics = []
 [dependencies]
 crossbeam-channel = "0.1.2"
 ctrlc             = "3.1.0"
+dirs              = "1.0.4"
 getch             = "0.2.0"
 glob              = "0.2.11"
 lazy_static       = "1.0.0"
@@ -40,10 +41,13 @@ rand              = "0.4.2"
 rlibc             = "1.0.0"
 rustc-serialize   = "0.3.24"
 scoped_threadpool = "0.1.9"
+serde             = "1.0.33"
+serde_derive      = "1.0.33"
 structopt         = "0.2.8"
 tempfile          = "3.0.2"
 term              = "0.5.1"
 time              = "0.1.40"
+toml              = "0.4.5"
 unicode-width     = "0.1.6"
 
 [profile.dev]
