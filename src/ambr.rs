@@ -29,20 +29,20 @@ use structopt::{clap, StructOpt};
 #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
 pub struct Opt {
     /// Keyword for search
-    #[structopt(name = "KEYWORD", required_unless = "key_file")]
-    pub keyword: Option<String>,
+    #[structopt(name = "KEYWORD")]
+    pub keyword: String,
 
     /// Keyword for replace
-    #[structopt(name = "REPLACEMENT", required_unless = "rep_file")]
-    pub replacement: Option<String>,
+    #[structopt(name = "REPLACEMENT")]
+    pub replacement: String,
 
-    /// Use file contents as KEYWORD
-    #[structopt(long = "key-file", value_name = "FILE")]
-    pub key_file: Option<String>,
+    /// Use file contents of KEYWORD as keyword for search
+    #[structopt(long = "key-from-file")]
+    pub key_from_file: bool,
 
-    /// Use file contents as REPLACEMENT
-    #[structopt(long = "rep-file", value_name = "FILE")]
-    pub rep_file: Option<String>,
+    /// Use file contents of REPLACEMENT as keyword for replacement
+    #[structopt(long = "rep-from-file")]
+    pub rep_from_file: bool,
 
     /// Search paths
     #[structopt(name = "PATHS")]
@@ -339,39 +339,44 @@ fn main() {
         }
     }
 
-    let keyword = match opt.key_file {
-        Some(f) => match read_from_file(&f) {
+    let keyword = if opt.key_from_file {
+        match read_from_file(&opt.keyword) {
             Ok(x) => {
                 if x.len() != 0 {
                     x
                 } else {
-                    console.write(ConsoleTextKind::Error, &format!("Error: file is empty @ {:?}\n", f));
+                    console.write(
+                        ConsoleTextKind::Error,
+                        &format!("Error: file is empty @ {:?}\n", opt.keyword),
+                    );
                     exit(1, &mut console);
                 }
             }
             Err(e) => {
                 console.write(
                     ConsoleTextKind::Error,
-                    &format!("Error: {} @ {:?}\n", decode_error(e.kind()), f),
+                    &format!("Error: {} @ {:?}\n", decode_error(e.kind()), opt.keyword),
                 );
                 exit(1, &mut console);
             }
-        },
-        None => opt.keyword.unwrap().clone().into_bytes(),
+        }
+    } else {
+        opt.keyword.into_bytes()
     };
 
-    let replacement = match opt.rep_file {
-        Some(f) => match read_from_file(&f) {
+    let replacement = if opt.rep_from_file {
+        match read_from_file(&opt.replacement) {
             Ok(x) => x,
             Err(e) => {
                 console.write(
                     ConsoleTextKind::Error,
-                    &format!("Error: {} @ {:?}\n", decode_error(e.kind()), f),
+                    &format!("Error: {} @ {:?}\n", decode_error(e.kind()), opt.replacement),
                 );
                 exit(1, &mut console);
             }
-        },
-        None => opt.replacement.unwrap().clone().into_bytes(),
+        }
+    } else {
+        opt.replacement.into_bytes()
     };
 
     // ---------------------------------------------------------------------------------------------

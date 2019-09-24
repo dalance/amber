@@ -29,12 +29,12 @@ use structopt::{clap, StructOpt};
 #[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
 pub struct Opt {
     /// Keyword for search
-    #[structopt(name = "KEYWORD", required_unless = "key_file")]
-    pub keyword: Option<String>,
+    #[structopt(name = "KEYWORD")]
+    pub keyword: String,
 
-    /// Use file contents as KEYWORD
-    #[structopt(long = "key-file", value_name = "FILE")]
-    pub key_file: Option<String>,
+    /// Use file contents of KEYWORD as keyword for search
+    #[structopt(long = "key-from-file")]
+    pub key_from_file: bool,
 
     /// Search paths
     #[structopt(name = "PATHS")]
@@ -317,25 +317,29 @@ fn main() {
         }
     }
 
-    let keyword = match opt.key_file {
-        Some(f) => match read_from_file(&f) {
+    let keyword = if opt.key_from_file {
+        match read_from_file(&opt.keyword) {
             Ok(x) => {
                 if x.len() != 0 {
                     x
                 } else {
-                    console.write(ConsoleTextKind::Error, &format!("Error: file is empty @ {:?}\n", f));
+                    console.write(
+                        ConsoleTextKind::Error,
+                        &format!("Error: file is empty @ {:?}\n", opt.keyword),
+                    );
                     exit(1, &mut console);
                 }
             }
             Err(e) => {
                 console.write(
                     ConsoleTextKind::Error,
-                    &format!("Error: {} @ {:?}\n", decode_error(e.kind()), f),
+                    &format!("Error: {} @ {:?}\n", decode_error(e.kind()), opt.keyword),
                 );
                 exit(1, &mut console);
             }
-        },
-        None => opt.keyword.unwrap().clone().into_bytes(),
+        }
+    } else {
+        opt.keyword.into_bytes()
     };
 
     // ---------------------------------------------------------------------------------------------
