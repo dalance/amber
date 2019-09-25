@@ -30,6 +30,9 @@ pub struct Console {
     colored_err: bool,
 }
 
+const CR: u8 = 0x0d;
+const LF: u8 = 0x0a;
+
 impl Console {
     pub fn new() -> Self {
         Console {
@@ -96,28 +99,38 @@ impl Console {
         });
     }
 
-    pub fn write_match_line(&mut self, src: &[u8], m: &Match) {
-        let mut beg = m.beg;
-        let mut end = m.end;
-        while beg > 0 {
-            if src[beg] == 0x0d || src[beg] == 0x0a {
-                beg += 1;
+    fn get_line_beg(src: &[u8], beg: usize) -> usize {
+        let mut ret = beg;
+        while ret > 0 {
+            if src[ret] == CR || src[ret] == LF {
+                ret += 1;
                 break;
             }
-            beg -= 1;
+            ret -= 1;
         }
-        while src.len() > end {
-            if src[end] == 0x0d || src[end] == 0x0a {
-                end -= 1;
+        ret
+    }
+
+    fn get_line_end(src: &[u8], end: usize) -> usize {
+        let mut ret = end;
+        while src.len() > ret {
+            if src[ret] == CR || src[ret] == LF {
+                ret -= 1;
                 break;
             }
-            end += 1;
+            ret += 1;
         }
-        if src.len() <= end {
-            end = src.len()
+        if src.len() <= ret {
+            ret = src.len()
         } else {
-            end += 1
+            ret += 1
         };
+        ret
+    }
+
+    pub fn write_match_line(&mut self, src: &[u8], m: &Match) {
+        let beg = Console::get_line_beg(src, m.beg);
+        let end = Console::get_line_end(src, m.end);
 
         if beg < m.beg {
             self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..m.beg]));
@@ -130,27 +143,8 @@ impl Console {
     }
 
     pub fn write_replace_line(&mut self, src: &[u8], m: &Match, rep: &[u8]) {
-        let mut beg = m.beg;
-        let mut end = m.end;
-        while beg > 0 {
-            if src[beg] == 0x0d || src[beg] == 0x0a {
-                beg += 1;
-                break;
-            }
-            beg -= 1;
-        }
-        while src.len() > end {
-            if src[end] == 0x0d || src[end] == 0x0a {
-                end -= 1;
-                break;
-            }
-            end += 1;
-        }
-        if src.len() <= end {
-            end = src.len()
-        } else {
-            end += 1
-        };
+        let beg = Console::get_line_beg(src, m.beg);
+        let end = Console::get_line_end(src, m.end);
 
         if beg < m.beg {
             self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..m.beg]));
