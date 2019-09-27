@@ -276,7 +276,7 @@ mod tests {
     use super::*;
     use crate::pipeline::{PipelineFork, PipelineInfo};
     use crossbeam_channel::unbounded;
-    use std::path::{Path,PathBuf};
+    use std::path::{Path, PathBuf};
     use std::thread;
 
     fn test<T: 'static + PipelineFork<PathBuf, PathInfo> + Send>(mut finder: T, path: String) -> Vec<PathInfo> {
