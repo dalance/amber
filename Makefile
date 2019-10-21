@@ -1,17 +1,18 @@
-#VERSION = $(subst \",, $(subst version =,, $(shell grep version Cargo.toml)))
 VERSION = $(patsubst "%",%, $(word 3, $(shell grep version Cargo.toml)))
 BUILD_TIME = $(shell date +"%Y/%m/%d %H:%M:%S")
 GIT_REVISION = $(shell git log -1 --format="%h")
+RUST_VERSION = $(word 2, $(shell rustc -V))
+LONG_VERSION = "$(VERSION) ( rev: $(GIT_REVISION), rustc: $(RUST_VERSION), build at: $(BUILD_TIME) )"
+BIN_NAME = amber
 
-export BUILD_TIME
-export GIT_REVISION
+export LONG_VERSION
 
 .PHONY: all test bench bench_sse clean release_lnx64 release_win64 release_osx64
 
-all: test bench
+all: test
 
 test:
-	cargo test -- --nocapture
+	cargo test
 
 bench:
 	cargo bench
@@ -25,23 +26,14 @@ build_statistics:
 clean:
 	cargo clean
 
-release_lnx32:
-	cargo build --release --target=i686-unknown-linux-gnu
-	zip -j amber-v${VERSION}-i686-lnx.zip target/i686-unknown-linux-gnu/release/amb?
+release_lnx:
+	cargo build --release --target=x86_64-unknown-linux-musl
+	zip -j ${BIN_NAME}-v${VERSION}-x86_64-lnx.zip target/x86_64-unknown-linux-musl/release/amb?
 
-release_lnx64:
-	cargo build --release --target=x86_64-unknown-linux-gnu
-	zip -j amber-v${VERSION}-x86_64-lnx.zip target/x86_64-unknown-linux-gnu/release/amb?
+release_win:
+	cargo build --release --target=x86_64-pc-windows-msvc
+	7z a ${BIN_NAME}-v${VERSION}-x86_64-win.zip target/x86_64-pc-windows-msvc/release/amb?.exe
 
-release_win64:
-	cargo build --release --target=x86_64-pc-windows-gnu
-	zip -j amber-v${VERSION}-x86_64-win.zip target/x86_64-pc-windows-gnu/release/amb?
-
-release_osx32:
-	cargo build --release --target=i686-apple-darwin
-	zip -j amber-v${VERSION}-i686-osx.zip target/i686-apple-darwin/release/amb?
-
-release_osx64:
+release_mac:
 	cargo build --release --target=x86_64-apple-darwin
-	zip -j amber-v${VERSION}-x86_64-osx.zip target/x86_64-apple-darwin/release/amb?
-
+	zip -j ${BIN_NAME}-v${VERSION}-x86_64-mac.zip target/x86_64-apple-darwin/release/amb?

@@ -1,0 +1,24 @@
+name: Coverage
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: xd009642/tarpaulin
+      volumes:
+        - $GITHUB_WORKSPACE:/volume
+      options: --security-opt seccomp=unconfined
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+    - name: Run tests
+      run: cargo tarpaulin -v --out Xml
+    - name: Upload coverage
+      uses: codecov/codecov-action@v1.0.3
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
