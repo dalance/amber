@@ -65,7 +65,7 @@ pub struct Opt {
     pub mmap_bytes: u64,
 
     /// Enable regular expression search
-    #[structopt(long = "regex", raw(hidden = "DEFAULT_FLAGS.regex"))]
+    #[structopt(short = "r", long = "regex", raw(hidden = "DEFAULT_FLAGS.regex"))]
     pub regex: bool,
 
     /// Enable column output
