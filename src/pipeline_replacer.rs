@@ -66,6 +66,8 @@ impl PipelineReplacer {
             let mut tmpfile = NamedTempFile::new_in(pm.path.parent().unwrap_or(&pm.path))?;
 
             let tmpfile_path = tmpfile.path().to_path_buf();
+            #[cfg(not(windows))]
+            let c_lflag = crate::util::get_c_lflag();
             let _ = ctrlc::set_handler(move || {
                 let path = tmpfile_path.clone();
                 let mut console = Console::new();
@@ -74,6 +76,8 @@ impl PipelineReplacer {
                     &format!("\nCleanup temporary file: {:?}\n", path),
                 );
                 let _ = fs::remove_file(path);
+                #[cfg(not(windows))]
+                crate::util::set_c_lflag(c_lflag);
                 exit(0, &mut console);
             });
 
@@ -152,6 +156,8 @@ impl PipelineReplacer {
                                 'A' | 'a' => self.all_replace = true,
                                 'Q' | 'q' => {
                                     let _ = tmpfile.close();
+                                    #[cfg(not(windows))]
+                                    crate::util::set_c_lflag(c_lflag);
                                     exit(0, &mut self.console);
                                 }
                                 _ => continue,

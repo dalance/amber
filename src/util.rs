@@ -96,3 +96,22 @@ pub fn exit(code: i32, console: &mut Console) -> ! {
     console.flush();
     process::exit(code);
 }
+
+#[cfg(not(windows))]
+pub fn set_c_lflag(c_lflag: Option<termios::tcflag_t>) {
+    if let Ok(mut termios) = termios::Termios::from_fd(0) {
+        if let Some(c_lflag) = c_lflag {
+            termios.c_lflag = c_lflag;
+            let _ = termios::tcsetattr(0, termios::TCSADRAIN, &termios);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn get_c_lflag() -> Option<termios::tcflag_t> {
+    if let Ok(termios) = termios::Termios::from_fd(0) {
+        Some(termios.c_lflag)
+    } else {
+        None
+    }
+}
