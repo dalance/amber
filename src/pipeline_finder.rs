@@ -191,16 +191,21 @@ impl PipelineFinder {
             }
         };
 
-        let mut parent = base_abs.parent();
-        while parent.is_some() {
-            if self.push_gitignore(&PathBuf::from(parent.unwrap())) {
-                self.infos.push(format!(
-                    "Found .gitignore at the parent directory: {:?}\n",
-                    parent.unwrap()
-                ));
-                return base_abs.clone();
+        let mut parent_abs = base_abs.parent();
+        let mut parent = base.clone();
+        if parent.is_dir() {
+            parent.push("..");
+        } else {
+            parent = parent.parent().unwrap().to_path_buf();
+        }
+        while parent_abs.is_some() {
+            if self.push_gitignore(&PathBuf::from(&parent)) {
+                self.infos
+                    .push(format!("Found .gitignore at the parent directory: {:?}\n", parent));
+                return base.clone();
             }
-            parent = parent.unwrap().parent();
+            parent_abs = parent_abs.unwrap().parent();
+            parent.push("..");
         }
 
         return base.clone();
