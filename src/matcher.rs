@@ -628,7 +628,7 @@ mod tests {
         assert_eq!((9, 10), (ret[5].beg, ret[5].end));
         assert_eq!((10, 11), (ret[6].beg, ret[6].end));
 
-        let src = "abcabcaaaaabc".to_string().into_bytes();
+        let src = "abcabcbbbaabc".to_string().into_bytes();
         let pat = "abc".to_string().into_bytes();
         let ret = m.search(&src, &pat);
         assert_eq!(ret.len(), 3);

@@ -4,6 +4,7 @@ use crate::pipeline_matcher::PathMatch;
 use crate::util::{catch, decode_error, exit};
 use crossbeam_channel::{Receiver, Sender};
 use ctrlc;
+use filetime::FileTime;
 use getch::Getch;
 use memmap::Mmap;
 use regex::Regex;
@@ -22,6 +23,7 @@ use unicode_width::UnicodeWidthStr;
 pub struct PipelineReplacer {
     pub is_color: bool,
     pub is_interactive: bool,
+    pub preserve_time: bool,
     pub print_file: bool,
     pub print_column: bool,
     pub print_row: bool,
@@ -41,6 +43,7 @@ impl PipelineReplacer {
         PipelineReplacer {
             is_color: true,
             is_interactive: true,
+            preserve_time: false,
             print_file: true,
             print_column: false,
             print_row: false,
@@ -50,7 +53,7 @@ impl PipelineReplacer {
             all_replace: false,
             keyword: Vec::from(keyword),
             replacement: Vec::from(replacement),
-            regex: regex,
+            regex,
             time_beg: Instant::now(),
             time_bsy: Duration::new(0, 0),
         }
@@ -184,8 +187,20 @@ impl PipelineReplacer {
 
             let metadata = fs::metadata(&real_path)?;
 
+            let time = if self.preserve_time {
+                let mtime = FileTime::from_last_modification_time(&metadata);
+                let atime = FileTime::from_last_access_time(&metadata);
+                Some((mtime, atime))
+            } else {
+                None
+            };
+
             fs::set_permissions(tmpfile.path(), metadata.permissions())?;
             tmpfile.persist(&real_path)?;
+
+            if let Some((mtime, atime)) = time {
+                filetime::set_file_times(&real_path, atime, mtime)?;
+            }
 
             Ok(())
         });

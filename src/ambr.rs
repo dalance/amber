@@ -124,6 +124,10 @@ pub struct Opt {
     #[structopt(long = "parent-ignore", raw(hidden = "DEFAULT_FLAGS.parent_ignore"))]
     pub parent_ignore: bool,
 
+    /// Enable timestamp preserve
+    #[structopt(long = "preserve-time", raw(hidden = "DEFAULT_FLAGS.preserve_time"))]
+    pub preserve_time: bool,
+
     /// Disable regular expression search
     #[structopt(long = "no-regex", raw(hidden = "!DEFAULT_FLAGS.regex"))]
     pub no_regex: bool,
@@ -184,6 +188,10 @@ pub struct Opt {
     #[structopt(long = "no-parent-ignore", raw(hidden = "!DEFAULT_FLAGS.parent_ignore"))]
     pub no_parent_ignore: bool,
 
+    /// Disable timestamp preserve
+    #[structopt(long = "no-preserve-time", raw(hidden = "!DEFAULT_FLAGS.preserve_time"))]
+    pub no_preserve_time: bool,
+
     /// [Experimental] Enable TBM matcher
     #[structopt(long = "tbm")]
     pub tbm: bool,
@@ -225,6 +233,8 @@ struct DefaultFlags {
     fixed_order: bool,
     #[serde(default = "flag_true")]
     parent_ignore: bool,
+    #[serde(default = "flag_false")]
+    preserve_time: bool,
 }
 
 impl DefaultFlags {
@@ -295,6 +305,11 @@ impl DefaultFlags {
             !opt.no_parent_ignore
         } else {
             opt.parent_ignore
+        };
+        opt.preserve_time = if self.preserve_time {
+            !opt.no_preserve_time
+        } else {
+            opt.preserve_time
         };
         opt
     }
@@ -410,6 +425,7 @@ fn main() {
     sorter.through = !opt.fixed_order;
     replacer.is_color = opt.color;
     replacer.is_interactive = opt.interactive;
+    replacer.preserve_time = opt.preserve_time;
     replacer.print_file = opt.file;
     replacer.print_column = opt.column;
     replacer.print_row = opt.row;

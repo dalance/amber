@@ -31,6 +31,7 @@ statistics = []
 crossbeam-channel = "0.1.2"
 ctrlc             = "3.1.0"
 dirs              = "1.0.4"
+filetime          = "0.2"
 getch             = "0.2.0"
 glob              = "0.2.11"
 lazy_static       = "1.0.0"
