@@ -11,7 +11,7 @@ dependencies = [
 
 [[package]]
 name = "amber"
-version = "0.5.7"
+version = "0.5.8-pre"
 dependencies = [
  "crossbeam-channel",
  "ctrlc",
