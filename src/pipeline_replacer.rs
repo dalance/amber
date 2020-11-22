@@ -2,7 +2,7 @@ use crate::console::{Console, ConsoleTextKind};
 use crate::pipeline::{Pipeline, PipelineInfo};
 use crate::pipeline_matcher::PathMatch;
 use crate::util::{catch, decode_error, exit};
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use ctrlc;
 use filetime::FileTime;
 use getch::Getch;

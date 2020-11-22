@@ -2,7 +2,7 @@ use crate::console::{Console, ConsoleTextKind};
 use crate::pipeline::{Pipeline, PipelineInfo};
 use crate::pipeline_matcher::PathMatch;
 use crate::util::{catch, decode_error};
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use memmap::Mmap;
 use std::fs::File;
 use std::io::Error;

@@ -225,7 +225,7 @@ impl IgnoreGit {
                     continue;
                 }
             }
-            if p.pat.matches_with(&name_str, &self.opt) {
+            if p.pat.matches_with(&name_str, self.opt) {
                 return true;
             }
         }
@@ -239,7 +239,7 @@ impl IgnoreGit {
                     continue;
                 }
             }
-            if p.pat.matches_with(&path_str, &self.opt) {
+            if p.pat.matches_with(&path_str, self.opt) {
                 return true;
             }
         }

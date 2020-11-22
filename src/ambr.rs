@@ -6,7 +6,7 @@ use amber::pipeline_matcher::PipelineMatcher;
 use amber::pipeline_replacer::PipelineReplacer;
 use amber::pipeline_sorter::PipelineSorter;
 use amber::util::{as_secsf64, decode_error, exit, read_from_file};
-use crossbeam_channel::unbounded;
+use crossbeam::channel::unbounded;
 use dirs;
 use lazy_static::lazy_static;
 use serde_derive::Deserialize;
@@ -24,9 +24,9 @@ use structopt::{clap, StructOpt};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "ambr")]
-#[structopt(raw(long_version = "option_env!(\"LONG_VERSION\").unwrap_or(env!(\"CARGO_PKG_VERSION\"))"))]
-#[structopt(raw(setting = "clap::AppSettings::ColoredHelp"))]
-#[structopt(raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
+#[structopt(long_version(option_env!("LONG_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))))]
+#[structopt(setting(clap::AppSettings::ColoredHelp))]
+#[structopt(setting(clap::AppSettings::DeriveDisplayOrder))]
 pub struct Opt {
     /// Keyword for search
     #[structopt(name = "KEYWORD")]
@@ -49,7 +49,7 @@ pub struct Opt {
     pub paths: Vec<String>,
 
     /// Number of max threads
-    #[structopt(long = "max-threads", raw(default_value = "&MAX_THREADS"), value_name = "NUM")]
+    #[structopt(long = "max-threads", default_value = "&MAX_THREADS", value_name = "NUM")]
     pub max_threads: usize,
 
     /// File size per one thread
@@ -65,131 +65,131 @@ pub struct Opt {
     pub mmap_bytes: u64,
 
     /// Enable regular expression search
-    #[structopt(short = "r", long = "regex", raw(hidden = "DEFAULT_FLAGS.regex"))]
+    #[structopt(short = "r", long = "regex", hidden = DEFAULT_FLAGS.regex)]
     pub regex: bool,
 
     /// Enable column output
-    #[structopt(long = "column", raw(hidden = "DEFAULT_FLAGS.column"))]
+    #[structopt(long = "column", hidden = DEFAULT_FLAGS.column)]
     pub column: bool,
 
     /// Enable row output
-    #[structopt(long = "row", raw(hidden = "DEFAULT_FLAGS.row"))]
+    #[structopt(long = "row", hidden = DEFAULT_FLAGS.row)]
     pub row: bool,
 
     /// Enable binary file search
-    #[structopt(long = "binary", raw(hidden = "DEFAULT_FLAGS.binary"))]
+    #[structopt(long = "binary", hidden = DEFAULT_FLAGS.binary)]
     pub binary: bool,
 
     /// Enable statistics output
-    #[structopt(long = "statistics", raw(hidden = "DEFAULT_FLAGS.statistics"))]
+    #[structopt(long = "statistics", hidden = DEFAULT_FLAGS.statistics)]
     pub statistics: bool,
 
     /// Enable skipped file output
-    #[structopt(long = "skipped", raw(hidden = "DEFAULT_FLAGS.skipped"))]
+    #[structopt(long = "skipped", hidden = DEFAULT_FLAGS.skipped)]
     pub skipped: bool,
 
     /// Enable interactive replace
-    #[structopt(long = "interactive", raw(hidden = "DEFAULT_FLAGS.interactive"))]
+    #[structopt(long = "interactive", hidden = DEFAULT_FLAGS.interactive)]
     pub interactive: bool,
 
     /// Enable recursive directory search
-    #[structopt(long = "recursive", raw(hidden = "DEFAULT_FLAGS.recursive"))]
+    #[structopt(long = "recursive", hidden = DEFAULT_FLAGS.recursive)]
     pub recursive: bool,
 
     /// Enable symbolic link follow
-    #[structopt(long = "symlink", raw(hidden = "DEFAULT_FLAGS.symlink"))]
+    #[structopt(long = "symlink", hidden = DEFAULT_FLAGS.symlink)]
     pub symlink: bool,
 
     /// Enable colored output
-    #[structopt(long = "color", raw(hidden = "DEFAULT_FLAGS.color"))]
+    #[structopt(long = "color", hidden = DEFAULT_FLAGS.color)]
     pub color: bool,
 
     /// Enable filename output
-    #[structopt(long = "file", raw(hidden = "DEFAULT_FLAGS.file"))]
+    #[structopt(long = "file", hidden = DEFAULT_FLAGS.file)]
     pub file: bool,
 
     /// Enable vcs directory ( .hg/.git/.svn ) skip
-    #[structopt(long = "skip-vcs", raw(hidden = "DEFAULT_FLAGS.skip_vcs"))]
+    #[structopt(long = "skip-vcs", hidden = DEFAULT_FLAGS.skip_vcs)]
     pub skip_vcs: bool,
 
     /// Enable .gitignore skip
-    #[structopt(long = "skip-gitignore", raw(hidden = "DEFAULT_FLAGS.skip_gitignore"))]
+    #[structopt(long = "skip-gitignore", hidden = DEFAULT_FLAGS.skip_gitignore)]
     pub skip_gitignore: bool,
 
     /// Enable output order guarantee
-    #[structopt(long = "fixed-order", raw(hidden = "DEFAULT_FLAGS.fixed_order"))]
+    #[structopt(long = "fixed-order", hidden = DEFAULT_FLAGS.fixed_order)]
     pub fixed_order: bool,
 
     /// Enable .*ignore file search at parent directories
-    #[structopt(long = "parent-ignore", raw(hidden = "DEFAULT_FLAGS.parent_ignore"))]
+    #[structopt(long = "parent-ignore", hidden = DEFAULT_FLAGS.parent_ignore)]
     pub parent_ignore: bool,
 
     /// Enable timestamp preserve
-    #[structopt(long = "preserve-time", raw(hidden = "DEFAULT_FLAGS.preserve_time"))]
+    #[structopt(long = "preserve-time", hidden = DEFAULT_FLAGS.preserve_time)]
     pub preserve_time: bool,
 
     /// Disable regular expression search
-    #[structopt(long = "no-regex", raw(hidden = "!DEFAULT_FLAGS.regex"))]
+    #[structopt(long = "no-regex", hidden = !DEFAULT_FLAGS.regex)]
     pub no_regex: bool,
 
     /// Disable column output
-    #[structopt(long = "no-column", raw(hidden = "!DEFAULT_FLAGS.column"))]
+    #[structopt(long = "no-column", hidden = !DEFAULT_FLAGS.column)]
     pub no_column: bool,
 
     /// Disable row output
-    #[structopt(long = "no-row", raw(hidden = "!DEFAULT_FLAGS.row"))]
+    #[structopt(long = "no-row", hidden = !DEFAULT_FLAGS.row)]
     pub no_row: bool,
 
     /// Disable binary file search
-    #[structopt(long = "no-binary", raw(hidden = "!DEFAULT_FLAGS.binary"))]
+    #[structopt(long = "no-binary", hidden = !DEFAULT_FLAGS.binary)]
     pub no_binary: bool,
 
     /// Disable statistics output
-    #[structopt(long = "no-statistics", raw(hidden = "!DEFAULT_FLAGS.statistics"))]
+    #[structopt(long = "no-statistics", hidden = !DEFAULT_FLAGS.statistics)]
     pub no_statistics: bool,
 
     /// Disable skipped file output
-    #[structopt(long = "no-skipped", raw(hidden = "!DEFAULT_FLAGS.skipped"))]
+    #[structopt(long = "no-skipped", hidden = !DEFAULT_FLAGS.skipped)]
     pub no_skipped: bool,
 
     /// Disable interactive replace
-    #[structopt(long = "no-interactive", raw(hidden = "!DEFAULT_FLAGS.interactive"))]
+    #[structopt(long = "no-interactive", hidden = !DEFAULT_FLAGS.interactive)]
     pub no_interactive: bool,
 
     /// Disable recursive directory search
-    #[structopt(long = "no-recursive", raw(hidden = "!DEFAULT_FLAGS.recursive"))]
+    #[structopt(long = "no-recursive", hidden = !DEFAULT_FLAGS.recursive)]
     pub no_recursive: bool,
 
     /// Disable symbolic link follow
-    #[structopt(long = "no-symlink", raw(hidden = "!DEFAULT_FLAGS.symlink"))]
+    #[structopt(long = "no-symlink", hidden = !DEFAULT_FLAGS.symlink)]
     pub no_symlink: bool,
 
     /// Disable colored output
-    #[structopt(long = "no-color", raw(hidden = "!DEFAULT_FLAGS.color"))]
+    #[structopt(long = "no-color", hidden = !DEFAULT_FLAGS.color)]
     pub no_color: bool,
 
     /// Disable filename output
-    #[structopt(long = "no-file", raw(hidden = "!DEFAULT_FLAGS.file"))]
+    #[structopt(long = "no-file", hidden = !DEFAULT_FLAGS.file)]
     pub no_file: bool,
 
     /// Disable vcs directory ( .hg/.git/.svn ) skip
-    #[structopt(long = "no-skip-vcs", raw(hidden = "!DEFAULT_FLAGS.skip_vcs"))]
+    #[structopt(long = "no-skip-vcs", hidden = !DEFAULT_FLAGS.skip_vcs)]
     pub no_skip_vcs: bool,
 
     /// Disable .gitignore skip
-    #[structopt(long = "no-skip-gitignore", raw(hidden = "!DEFAULT_FLAGS.skip_gitignore"))]
+    #[structopt(long = "no-skip-gitignore", hidden = !DEFAULT_FLAGS.skip_gitignore)]
     pub no_skip_gitignore: bool,
 
     /// Disable output order guarantee
-    #[structopt(long = "no-fixed-order", raw(hidden = "!DEFAULT_FLAGS.fixed_order"))]
+    #[structopt(long = "no-fixed-order", hidden = !DEFAULT_FLAGS.fixed_order)]
     pub no_fixed_order: bool,
 
     /// Disable .*ignore file search at parent directories
-    #[structopt(long = "no-parent-ignore", raw(hidden = "!DEFAULT_FLAGS.parent_ignore"))]
+    #[structopt(long = "no-parent-ignore", hidden = !DEFAULT_FLAGS.parent_ignore)]
     pub no_parent_ignore: bool,
 
     /// Disable timestamp preserve
-    #[structopt(long = "no-preserve-time", raw(hidden = "!DEFAULT_FLAGS.preserve_time"))]
+    #[structopt(long = "no-preserve-time", hidden = !DEFAULT_FLAGS.preserve_time)]
     pub no_preserve_time: bool,
 
     /// [Experimental] Enable TBM matcher

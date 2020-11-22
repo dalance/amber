@@ -1,6 +1,6 @@
 use crate::ignore::{Ignore, IgnoreGit, IgnoreVcs};
 use crate::pipeline::{PipelineFork, PipelineInfo};
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -281,7 +281,7 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
 mod tests {
     use super::*;
     use crate::pipeline::{PipelineFork, PipelineInfo};
-    use crossbeam_channel::unbounded;
+    use crossbeam::channel::unbounded;
     use std::path::{Path, PathBuf};
     use std::thread;
 

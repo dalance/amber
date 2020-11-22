@@ -2,7 +2,7 @@ use crate::matcher::{Match, Matcher};
 use crate::pipeline::{Pipeline, PipelineInfo};
 use crate::pipeline_finder::PathInfo;
 use crate::util::{catch, decode_error};
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use memmap::Mmap;
 use std::fs::{self, File};
 use std::io::{Error, Read};
@@ -183,7 +183,7 @@ mod tests {
     use crate::matcher::QuickSearchMatcher;
     use crate::pipeline::{Pipeline, PipelineInfo};
     use crate::pipeline_finder::PathInfo;
-    use crossbeam_channel::unbounded;
+    use crossbeam::channel::unbounded;
     use std::path::PathBuf;
     use std::thread;
 

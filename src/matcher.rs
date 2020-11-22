@@ -1,4 +1,4 @@
-use crossbeam_channel::unbounded;
+use crossbeam::channel::unbounded;
 use regex::RegexBuilder;
 use rlibc::memcmp;
 use scoped_threadpool::Pool;

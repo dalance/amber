@@ -1,6 +1,6 @@
 use crate::pipeline::{PipelineInfo, PipelineJoin};
 use crate::pipeline_matcher::PathMatch;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -117,7 +117,7 @@ mod tests {
     use super::*;
     use crate::pipeline::{PipelineInfo, PipelineJoin};
     use crate::pipeline_matcher::PathMatch;
-    use crossbeam_channel::unbounded;
+    use crossbeam::channel::unbounded;
     use std::path::PathBuf;
     use std::thread;
 
