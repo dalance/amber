@@ -130,16 +130,17 @@ impl PipelineFinder {
             return false;
         }
 
-        let reader = fs::read_dir(&path).unwrap();
-        for i in reader {
-            match i {
-                Ok(entry) => {
-                    if entry.path().ends_with(".gitignore") {
-                        self.ignore_git.push(IgnoreGit::new(&entry.path()));
-                        return true;
+        if let Ok(reader) = fs::read_dir(&path) {
+            for i in reader {
+                match i {
+                    Ok(entry) => {
+                        if entry.path().ends_with(".gitignore") {
+                            self.ignore_git.push(IgnoreGit::new(&entry.path()));
+                            return true;
+                        }
                     }
+                    Err(e) => self.errors.push(format!("Error: {}", e)),
                 }
-                Err(e) => self.errors.push(format!("Error: {}", e)),
             }
         }
         false
