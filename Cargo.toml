@@ -1,6 +1,6 @@
 [package]
 name = "amber"
-version = "0.5.7-pre"
+version = "0.5.7"
 authors = ["dalance@gmail.com"]
 repository = "https://github.com/dalance/amber"
 keywords = ["search", "replace"]
