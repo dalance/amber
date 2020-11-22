@@ -1,5 +1,5 @@
 use crossbeam_channel::unbounded;
-use regex::Regex;
+use regex::RegexBuilder;
 use rlibc::memcmp;
 use scoped_threadpool::Pool;
 use std::cmp;
@@ -536,7 +536,7 @@ impl Matcher for RegexMatcher {
             Err(_) => return Vec::new(),
         };
 
-        let re = match Regex::new(pat_str) {
+        let re = match RegexBuilder::new(pat_str).multi_line(true).build() {
             Ok(x) => x,
             Err(_) => return Vec::new(),
         };
