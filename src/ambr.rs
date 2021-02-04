@@ -49,7 +49,7 @@ pub struct Opt {
     pub paths: Vec<String>,
 
     /// Number of max threads
-    #[structopt(long = "max-threads", default_value = "&MAX_THREADS", value_name = "NUM")]
+    #[structopt(long = "max-threads", default_value = &MAX_THREADS, value_name = "NUM")]
     pub max_threads: usize,
 
     /// File size per one thread
