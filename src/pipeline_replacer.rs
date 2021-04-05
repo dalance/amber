@@ -217,6 +217,9 @@ impl PipelineReplacer {
         // All unwrap() is safe bacause keyword is already matched in pipeline_matcher
         let org = str::from_utf8(org).unwrap();
         let keyword = str::from_utf8(&self.keyword).unwrap();
+        // `\b` may not be matched with `org` because `\b` is affected by the charactor before and
+        // after `org`.
+        let keyword = keyword.trim_start_matches("\\b").trim_end_matches("\\b");
         let replacement = str::from_utf8(&self.replacement).unwrap();
         let regex = Regex::new(&keyword).unwrap();
         let captures = regex.captures(&org).unwrap();
