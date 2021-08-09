@@ -47,7 +47,7 @@ serde_derive      = "1"
 structopt         = "0.3"
 tempfile          = "3"
 term              = "0.7"
-time              = "0.2"
+time              = "0.3"
 toml              = "0.5"
 unicode-width     = "0.1"
 
