@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "sse", feature(asm))]
-
 #[macro_use]
 pub mod util;
 pub mod console;

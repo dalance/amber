@@ -675,25 +675,9 @@ mod tests {
         test_matcher(&matcher);
     }
 
-    #[cfg(feature = "sse")]
-    #[test]
-    fn test_quick_search_matcher_sse() {
-        let mut matcher = QuickSearchMatcher::new();
-        matcher.use_sse = true;
-        test_matcher(&matcher);
-    }
-
     #[test]
     fn test_tbm_matcher() {
         let matcher = TbmMatcher::new();
-        test_matcher(&matcher);
-    }
-
-    #[cfg(feature = "sse")]
-    #[test]
-    fn test_tbm_matcher_sse() {
-        let mut matcher = TbmMatcher::new();
-        matcher.use_sse = true;
         test_matcher(&matcher);
     }
 
