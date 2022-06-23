@@ -217,28 +217,28 @@ impl IgnoreGit {
         let path_end = (path_str.len() - 1) as isize;
 
         for p in names {
-            unsafe {
-                if (p.head != 0) && (*name_ptr != p.head) {
+            
+                if (p.head != 0) && (unsafe { *name_ptr } != p.head) {
                     continue;
                 }
-                if (p.tail != 0) && (*name_ptr.offset(name_end) != p.tail) {
+                if (p.tail != 0) && (unsafe { *name_ptr.offset(name_end) } != p.tail) {
                     continue;
                 }
-            }
+            
             if p.pat.matches_with(&name_str, self.opt) {
                 return true;
             }
         }
 
         for p in paths {
-            unsafe {
-                if (p.head != 0) && (*path_ptr != p.head) {
+            
+                if (p.head != 0) && (unsafe { *path_ptr } != p.head) {
                     continue;
                 }
-                if (p.tail != 0) && (*path_ptr.offset(path_end) != p.tail) {
+                if (p.tail != 0) && (unsafe { *path_ptr.offset(path_end) } != p.tail) {
                     continue;
                 }
-            }
+            
             if p.pat.matches_with(&path_str, self.opt) {
                 return true;
             }
