@@ -589,20 +589,20 @@ impl MatcherUtil {
         let pos4 = if pos + 4 >= src_len { src_len - 1 } else { pos + 4 };
         let pos5 = if pos + 5 >= src_len { src_len - 1 } else { pos + 5 };
         match (src[pos0], src[pos1], src[pos2], src[pos3], src[pos4], src[pos5]) {
-            (0x00..=0x7f, _, _, _, _, _) => (1),                                         // ASCII
-            (0xc2..=0xdf, 0x80..=0xbf, _, _, _, _) => (2),                               // UTF-8
-            (0xe0..=0xef, 0x80..=0xbf, 0x80..=0xbf, _, _, _) => (3),                     // UTF-8
-            (0xf0..=0xf7, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, _, _) => (4),           // UTF-8
-            (0xf8..=0xfb, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, _) => (5), // UTF-8
-            (0xfc..=0xfd, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf) => (6), // UTF-8
-            (0x8e, 0xa1..=0xdf, _, _, _, _) => (2),                                      // EUC-JP
-            (0xa1..=0xfe, 0xa1..=0xfe, _, _, _, _) => (2),                               // EUC-JP
-            (0xa1..=0xdf, _, _, _, _, _) => (1),                                         // ShiftJIS
-            (0x81..=0x9f, 0x40..=0x7e, _, _, _, _) => (2),                               // ShiftJIS
-            (0x81..=0x9f, 0x80..=0xfc, _, _, _, _) => (2),                               // ShiftJIS
-            (0xe0..=0xef, 0x40..=0x7e, _, _, _, _) => (2),                               // ShiftJIS
-            (0xe0..=0xef, 0x80..=0xfc, _, _, _, _) => (2),                               // ShiftJIS
-            _ => (1),                                                                    // Unknown
+            (0x00..=0x7f, _, _, _, _, _) => 1,                                         // ASCII
+            (0xc2..=0xdf, 0x80..=0xbf, _, _, _, _) => 2,                               // UTF-8
+            (0xe0..=0xef, 0x80..=0xbf, 0x80..=0xbf, _, _, _) => 3,                     // UTF-8
+            (0xf0..=0xf7, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, _, _) => 4,           // UTF-8
+            (0xf8..=0xfb, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, _) => 5, // UTF-8
+            (0xfc..=0xfd, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf, 0x80..=0xbf) => 6, // UTF-8
+            (0x8e, 0xa1..=0xdf, _, _, _, _) => 2,                                      // EUC-JP
+            (0xa1..=0xfe, 0xa1..=0xfe, _, _, _, _) => 2,                               // EUC-JP
+            (0xa1..=0xdf, _, _, _, _, _) => 1,                                         // ShiftJIS
+            (0x81..=0x9f, 0x40..=0x7e, _, _, _, _) => 2,                               // ShiftJIS
+            (0x81..=0x9f, 0x80..=0xfc, _, _, _, _) => 2,                               // ShiftJIS
+            (0xe0..=0xef, 0x40..=0x7e, _, _, _, _) => 2,                               // ShiftJIS
+            (0xe0..=0xef, 0x80..=0xfc, _, _, _, _) => 2,                               // ShiftJIS
+            _ => 1,                                                                    // Unknown
         }
     }
 }

@@ -9,7 +9,7 @@ use amber::util::{as_secsf64, decode_error, exit, read_from_file};
 use crossbeam::channel::unbounded;
 use dirs;
 use lazy_static::lazy_static;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::cmp;
 use std::fs;
 use std::io::Read;
