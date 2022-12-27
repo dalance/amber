@@ -104,10 +104,10 @@ impl PipelineReplacer {
 
                     let mut do_replace = true;
                     if self.is_interactive & !self.all_replace {
-                        let mut header_witdh = 0;
+                        let mut header_width = 0;
                         if self.print_file {
                             let path = pm.path.to_str().unwrap();
-                            header_witdh += UnicodeWidthStr::width(path) + 2;
+                            header_width += UnicodeWidthStr::width(path) + 2;
                             self.console.write(ConsoleTextKind::Filename, path);
                             self.console.write(ConsoleTextKind::Other, ": ");
                         }
@@ -121,25 +121,25 @@ impl PipelineReplacer {
                             }
                             if self.print_column {
                                 let column_str = format!("{}:", column + 1);
-                                header_witdh += column_str.width();
+                                header_width += column_str.width();
                                 self.console.write(ConsoleTextKind::Other, &column_str);
                             }
                             if self.print_row {
                                 let row_str = format!("{}:", m.beg - last_lf);
-                                header_witdh += row_str.width();
+                                header_width += row_str.width();
                                 self.console.write(ConsoleTextKind::Other, &row_str);
                             }
                         }
 
-                        if header_witdh < 4 {
+                        if header_width < 4 {
                             self.console
-                                .write(ConsoleTextKind::Other, &format!("{}", " ".repeat(4 - header_witdh)));
-                            header_witdh = 4;
+                                .write(ConsoleTextKind::Other, &format!("{}", " ".repeat(4 - header_width)));
+                            header_width = 4;
                         }
 
                         self.console.write_match_line(src, m);
                         self.console
-                            .write(ConsoleTextKind::Other, &format!("{} -> ", " ".repeat(header_witdh - 4)));
+                            .write(ConsoleTextKind::Other, &format!("{} -> ", " ".repeat(header_width - 4)));
                         self.console.write_replace_line(src, m, &replacement);
 
                         let getch = Getch::new();
@@ -214,10 +214,10 @@ impl PipelineReplacer {
     }
 
     fn get_regex_replacement(&self, org: &[u8]) -> Vec<u8> {
-        // All unwrap() is safe bacause keyword is already matched in pipeline_matcher
+        // All unwrap() is safe because keyword is already matched in pipeline_matcher
         let org = str::from_utf8(org).unwrap();
         let keyword = str::from_utf8(&self.keyword).unwrap();
-        // `\b` may not be matched with `org` because `\b` is affected by the charactor before and
+        // `\b` may not be matched with `org` because `\b` is affected by the character before and
         // after `org`.
         let keyword = keyword.trim_start_matches("\\b").trim_end_matches("\\b");
         let replacement = str::from_utf8(&self.replacement).unwrap();
