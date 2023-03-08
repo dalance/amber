@@ -28,7 +28,17 @@ You can decide to do replacing or not interactively.
 ### Arch Linux
 Install the `amber-search-git` package from AUR.
 
-```yaourt -S amber-search-git```
+```
+yaourt -S amber-search-git
+```
+
+### Cargo
+
+You can install with [cargo](https://crates.io/crates/amber).
+
+```
+cargo install amber
+```
 
 ### Manual
 Download from [release page](https://github.com/dalance/amber/releases/latest), and extract to the directory in PATH.
