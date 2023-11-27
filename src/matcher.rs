@@ -1,10 +1,10 @@
 use crossbeam::channel::unbounded;
 use regex::RegexBuilder;
 use rlibc::memcmp;
-use scoped_threadpool::Pool;
 use std::cmp;
 use std::collections::HashMap;
 use std::str;
+use std::thread;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Matcher
@@ -183,14 +183,12 @@ impl Matcher for QuickSearchMatcher {
             self.search_sub(src, pat, &qs_table, 0, src_len)
         } else {
             let (tx, rx) = unbounded();
-            let mut pool = Pool::new(thread_num as u32);
-
-            pool.scoped(|scoped| {
+            thread::scope(|s| {
                 for i in 0..thread_num {
                     let tx = tx.clone();
                     let beg = src_len * i / thread_num;
                     let end = src_len * (i + 1) / thread_num;
-                    scoped.execute(move || {
+                    s.spawn(move || {
                         let tmp = self.search_sub(src, pat, &qs_table, beg, end);
                         let _ = tx.send((i, tmp));
                     });
@@ -314,14 +312,12 @@ impl Matcher for TbmMatcher {
             self.search_sub(src, pat, &qs_table, md2, 0, src_len)
         } else {
             let (tx, rx) = unbounded();
-            let mut pool = Pool::new(thread_num as u32);
-
-            pool.scoped(|scoped| {
+            thread::scope(|s| {
                 for i in 0..thread_num {
                     let tx = tx.clone();
                     let beg = src_len * i / thread_num;
                     let end = src_len * (i + 1) / thread_num;
-                    scoped.execute(move || {
+                    s.spawn(move || {
                         let tmp = self.search_sub(src, pat, &qs_table, md2, beg, end);
                         let _ = tx.send((i, tmp));
                     });
@@ -480,14 +476,12 @@ impl Matcher for FjsMatcher {
             self.search_sub(src, pat, &betap, &delta, 0, src_len)
         } else {
             let (tx, rx) = unbounded();
-            let mut pool = Pool::new(thread_num as u32);
-
-            pool.scoped(|scoped| {
+            thread::scope(|s| {
                 for i in 0..thread_num {
                     let tx = tx.clone();
                     let beg = src_len * i / thread_num;
                     let end = src_len * (i + 1) / thread_num;
-                    scoped.execute(move || {
+                    s.spawn(move || {
                         let tmp = self.search_sub(src, pat, &betap, &delta, beg, end);
                         let _ = tx.send((i, tmp));
                     });
