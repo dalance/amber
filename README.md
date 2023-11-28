@@ -92,6 +92,7 @@ skip_vcs       = true
 skip_gitignore = true
 fixed_order    = true
 parent_ignore  = true
+line_by_match  = false
 ```
 
 You can choose some entries to override like below:

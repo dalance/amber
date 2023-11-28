@@ -18,6 +18,7 @@ pub struct PipelinePrinter {
     pub print_file: bool,
     pub print_column: bool,
     pub print_row: bool,
+    pub print_line_by_match: bool,
     pub infos: Vec<String>,
     pub errors: Vec<String>,
     console: Console,
@@ -32,6 +33,7 @@ impl PipelinePrinter {
             print_file: true,
             print_column: false,
             print_row: false,
+            print_line_by_match: false,
             infos: Vec::new(),
             errors: Vec::new(),
             console: Console::new(),
@@ -54,29 +56,78 @@ impl PipelinePrinter {
             let mut pos = 0;
             let mut column = 0;
             let mut last_lf = 0;
-            for m in &pm.matches {
-                if self.print_file {
-                    self.console.write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
-                    self.console.write(ConsoleTextKind::Filename, ":");
-                }
-                if self.print_column | self.print_row {
-                    while pos < m.beg {
-                        if src[pos] == 0x0a {
-                            column += 1;
-                            last_lf = pos;
+            let mut last_line_beg = usize::MAX;
+            let mut last_m_end = usize::MAX;
+
+            if self.print_line_by_match {
+                for m in &pm.matches {
+                    if self.print_file {
+                        self.console.write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
+                        self.console.write(ConsoleTextKind::Filename, ":");
+                    }
+                    if self.print_column | self.print_row {
+                        while pos < m.beg {
+                            if src[pos] == 0x0a {
+                                column += 1;
+                                last_lf = pos;
+                            }
+                            pos += 1;
                         }
-                        pos += 1;
+                        if self.print_column {
+                            self.console.write(ConsoleTextKind::Other, &format!("{}:", column + 1));
+                        }
+                        if self.print_row {
+                            self.console
+                                .write(ConsoleTextKind::Other, &format!("{}:", m.beg - last_lf));
+                        }
                     }
-                    if self.print_column {
-                        self.console.write(ConsoleTextKind::Other, &format!("{}:", column + 1));
+
+                    self.console.write_match_line(src, m);
+                }
+            } else {
+                for m in &pm.matches {
+                    let line_beg = Console::get_line_beg(src, m.beg);
+
+                    if last_line_beg != line_beg {
+                        if last_m_end != usize::MAX {
+                            let line_end = Console::get_line_end(src, last_m_end);
+                            self.console.write_to_linebreak(src, last_m_end, line_end);
+                        }
+
+                        if self.print_file {
+                            self.console.write(ConsoleTextKind::Filename, pm.path.to_str().unwrap());
+                            self.console.write(ConsoleTextKind::Filename, ":");
+                        }
+                        if self.print_column | self.print_row {
+                            while pos < m.beg {
+                                if src[pos] == 0x0a {
+                                    column += 1;
+                                    last_lf = pos;
+                                }
+                                pos += 1;
+                            }
+                            if self.print_column {
+                                self.console.write(ConsoleTextKind::Other, &format!("{}:", column + 1));
+                            }
+                            if self.print_row {
+                                self.console
+                                    .write(ConsoleTextKind::Other, &format!("{}:", m.beg - last_lf));
+                            }
+                        }
+
+                        self.console.write_match_part(src, m, line_beg);
+                    } else {
+                        self.console.write_match_part(src, m, last_m_end);
                     }
-                    if self.print_row {
-                        self.console
-                            .write(ConsoleTextKind::Other, &format!("{}:", m.beg - last_lf));
-                    }
+
+                    last_line_beg = line_beg;
+                    last_m_end = m.end;
                 }
 
-                self.console.write_match_line(src, m);
+                if last_m_end != usize::MAX {
+                    let line_end = Console::get_line_end(src, last_m_end);
+                    self.console.write_to_linebreak(src, last_m_end, line_end);
+                }
             }
 
             Ok(())

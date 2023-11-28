@@ -99,7 +99,7 @@ impl Console {
         });
     }
 
-    fn get_line_beg(src: &[u8], beg: usize) -> usize {
+    pub fn get_line_beg(src: &[u8], beg: usize) -> usize {
         let mut ret = beg;
         while ret > 0 {
             if src[ret] == CR || src[ret] == LF {
@@ -111,7 +111,7 @@ impl Console {
         ret
     }
 
-    fn get_line_end(src: &[u8], end: usize) -> usize {
+    pub fn get_line_end(src: &[u8], end: usize) -> usize {
         let mut ret = end;
         while src.len() > ret {
             if src[ret] == CR || src[ret] == LF {
@@ -126,6 +126,20 @@ impl Console {
             ret += 1
         };
         ret
+    }
+
+    pub fn write_to_linebreak(&mut self, src: &[u8], beg: usize, end: usize) {
+        if beg < end {
+            self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..end]));
+        }
+        self.write(ConsoleTextKind::Text, "\n");
+    }
+
+    pub fn write_match_part(&mut self, src: &[u8], m: &Match, beg: usize) {
+        if beg < m.beg {
+            self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..m.beg]));
+        }
+        self.write(ConsoleTextKind::MatchText, &String::from_utf8_lossy(&src[m.beg..m.end]));
     }
 
     pub fn write_match_line(&mut self, src: &[u8], m: &Match) {

@@ -112,6 +112,10 @@ pub struct Opt {
     #[structopt(long = "parent-ignore", hidden = DEFAULT_FLAGS.parent_ignore)]
     pub parent_ignore: bool,
 
+    /// Enable to show the line by each match
+    #[structopt(long = "line-by-match", hidden = DEFAULT_FLAGS.line_by_match)]
+    pub line_by_match: bool,
+
     /// Disable regular expression search
     #[structopt(long = "no-regex", hidden = !DEFAULT_FLAGS.regex)]
     pub no_regex: bool,
@@ -168,6 +172,10 @@ pub struct Opt {
     #[structopt(long = "no-parent-ignore", hidden = !DEFAULT_FLAGS.parent_ignore)]
     pub no_parent_ignore: bool,
 
+    /// Disable to show the line by each match
+    #[structopt(long = "no-line-by-match", hidden = !DEFAULT_FLAGS.line_by_match)]
+    pub no_line_by_match: bool,
+
     /// [Experimental] Enable TBM matcher
     #[structopt(long = "tbm")]
     pub tbm: bool,
@@ -207,6 +215,8 @@ struct DefaultFlags {
     fixed_order: bool,
     #[serde(default = "flag_true")]
     parent_ignore: bool,
+    #[serde(default = "flag_false")]
+    line_by_match: bool,
 }
 
 impl DefaultFlags {
@@ -272,6 +282,11 @@ impl DefaultFlags {
             !opt.no_parent_ignore
         } else {
             opt.parent_ignore
+        };
+        opt.line_by_match = if self.line_by_match {
+            !opt.no_line_by_match
+        } else {
+            opt.line_by_match
         };
         opt
     }
@@ -375,6 +390,7 @@ fn main() {
     printer.print_file = opt.file;
     printer.print_column = opt.column;
     printer.print_row = opt.row;
+    printer.print_line_by_match = opt.line_by_match;
 
     let use_regex = opt.regex;
     let use_tbm = opt.tbm;
