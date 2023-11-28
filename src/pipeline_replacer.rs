@@ -8,9 +8,11 @@ use filetime::FileTime;
 use getch::Getch;
 use memmap::Mmap;
 use regex::Regex;
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Error, Write};
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::str;
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
@@ -36,6 +38,7 @@ pub struct PipelineReplacer {
     regex: bool,
     time_beg: Instant,
     time_bsy: Duration,
+    replaced_paths: HashSet<PathBuf>,
 }
 
 impl PipelineReplacer {
@@ -56,6 +59,7 @@ impl PipelineReplacer {
             regex,
             time_beg: Instant::now(),
             time_bsy: Duration::new(0, 0),
+            replaced_paths: HashSet::default(),
         }
     }
 
@@ -63,6 +67,18 @@ impl PipelineReplacer {
         if pm.matches.is_empty() {
             return;
         }
+
+        // Check duplicate paths caused by symlink
+        if let Ok(path) = pm.path.canonicalize() {
+            if self.replaced_paths.contains(&path) {
+                return;
+            } else {
+                self.replaced_paths.insert(path);
+            }
+        } else {
+            return;
+        }
+
         self.console.is_color = self.is_color;
 
         let result = catch::<_, (), Error>(|| {
