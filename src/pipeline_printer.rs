@@ -26,6 +26,12 @@ pub struct PipelinePrinter {
     time_bsy: Duration,
 }
 
+impl Default for PipelinePrinter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PipelinePrinter {
     pub fn new() -> Self {
         PipelinePrinter {

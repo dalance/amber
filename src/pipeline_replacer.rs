@@ -133,7 +133,7 @@ impl PipelineReplacer {
 
                         if header_width < 4 {
                             self.console
-                                .write(ConsoleTextKind::Other, &format!("{}", " ".repeat(4 - header_width)));
+                                .write(ConsoleTextKind::Other, &" ".repeat(4 - header_width).to_string());
                             header_width = 4;
                         }
 
@@ -221,11 +221,11 @@ impl PipelineReplacer {
         // after `org`.
         let keyword = keyword.trim_start_matches("\\b").trim_end_matches("\\b");
         let replacement = str::from_utf8(&self.replacement).unwrap();
-        let regex = Regex::new(&keyword).unwrap();
-        let captures = regex.captures(&org).unwrap();
+        let regex = Regex::new(keyword).unwrap();
+        let captures = regex.captures(org).unwrap();
 
         let mut dst = String::new();
-        captures.expand(&replacement, &mut dst);
+        captures.expand(replacement, &mut dst);
 
         dst.into_bytes()
     }

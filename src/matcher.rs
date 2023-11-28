@@ -68,6 +68,12 @@ impl BruteForceMatcher {
     }
 }
 
+impl Default for BruteForceMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Matcher for BruteForceMatcher {
     fn search(&self, src: &[u8], pat: &[u8]) -> Vec<Match> {
         let src_len = src.len();
@@ -111,6 +117,12 @@ pub struct QuickSearchMatcher {
     pub size_per_thread: usize,
 }
 
+impl Default for QuickSearchMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QuickSearchMatcher {
     pub fn new() -> Self {
         QuickSearchMatcher {
@@ -136,27 +148,25 @@ impl QuickSearchMatcher {
 
             let success;
             unsafe {
-                let ret = memcmp(src_ptr.offset(i as isize), pat_ptr, pat_len);
-                success = if ret == 0 { true } else { false };
+                let ret = memcmp(src_ptr.add(i), pat_ptr, pat_len);
+                success = ret == 0;
             }
 
-            if success {
-                if MatcherUtil::check_char_boundary(src, i) {
-                    ret.push(Match {
-                        beg: i,
-                        end: i + pat_len,
-                        sub_match: Vec::new(),
-                    });
-                    i += pat_len;
-                    continue;
-                }
+            if success && MatcherUtil::check_char_boundary(src, i) {
+                ret.push(Match {
+                    beg: i,
+                    end: i + pat_len,
+                    sub_match: Vec::new(),
+                });
+                i += pat_len;
+                continue;
             }
 
             if src_len <= i + pat_len {
                 break;
             }
             unsafe {
-                let t = *src_ptr.offset((i + pat_len) as isize) as isize;
+                let t = *src_ptr.add(i + pat_len) as isize;
                 i += *qs_ptr.offset(t);
             }
         }
@@ -222,6 +232,12 @@ pub struct TbmMatcher {
     pub size_per_thread: usize,
 }
 
+impl Default for TbmMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TbmMatcher {
     pub fn new() -> Self {
         TbmMatcher {
@@ -262,7 +278,7 @@ impl TbmMatcher {
             }
 
             unsafe {
-                let ret = memcmp(src_ptr.offset((i + 1 - pat_len) as isize), pat_ptr, pat_len);
+                let ret = memcmp(src_ptr.add(i + 1 - pat_len), pat_ptr, pat_len);
                 if ret != 0 {
                     i += md2;
                     continue 'outer;
@@ -352,6 +368,12 @@ pub struct FjsMatcher {
     pub use_sse: bool,
 }
 
+impl Default for FjsMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FjsMatcher {
     pub fn new() -> Self {
         FjsMatcher {
@@ -382,7 +404,7 @@ impl FjsMatcher {
         let mut prev: isize = -(pat_len as isize);
 
         while ip < end {
-            if j <= 0 {
+            if j == 0 {
                 if ip + 1 >= src_len {
                     return ret;
                 }
@@ -398,21 +420,19 @@ impl FjsMatcher {
                     i += 1;
                     j += 1;
                 }
-                if j == mp {
-                    if MatcherUtil::check_char_boundary(src, i - mp) {
-                        if prev + pat_len as isize <= (i - mp) as isize {
-                            ret.push(Match {
-                                beg: i - mp,
-                                end: i - mp + pat_len,
-                                sub_match: Vec::new(),
-                            });
-                            prev = (i - mp) as isize;
-                        }
-                        i += 1;
-                        j += 1;
+                if j == mp && MatcherUtil::check_char_boundary(src, i - mp) {
+                    if prev + pat_len as isize <= (i - mp) as isize {
+                        ret.push(Match {
+                            beg: i - mp,
+                            end: i - mp + pat_len,
+                            sub_match: Vec::new(),
+                        });
+                        prev = (i - mp) as isize;
                     }
+                    i += 1;
+                    j += 1;
                 }
-                if j <= 0 {
+                if j == 0 {
                     i += 1;
                 } else {
                     j = betap[j] as usize;
@@ -422,17 +442,16 @@ impl FjsMatcher {
                     i += 1;
                     j += 1;
                 }
-                if j == pat_len {
-                    if MatcherUtil::check_char_boundary(src, i - pat_len) {
-                        if prev + pat_len as isize <= (i - pat_len) as isize {
-                            ret.push(Match {
-                                beg: i - pat_len,
-                                end: i,
-                                sub_match: Vec::new(),
-                            });
-                            prev = (i - pat_len) as isize;
-                        }
-                    }
+                if j == pat_len
+                    && MatcherUtil::check_char_boundary(src, i - pat_len)
+                    && prev + pat_len as isize <= (i - pat_len) as isize
+                {
+                    ret.push(Match {
+                        beg: i - pat_len,
+                        end: i,
+                        sub_match: Vec::new(),
+                    });
+                    prev = (i - pat_len) as isize;
                 }
                 j = betap[j] as usize;
             }
@@ -515,6 +534,12 @@ pub struct RegexMatcher;
 impl RegexMatcher {
     pub fn new() -> Self {
         RegexMatcher
+    }
+}
+
+impl Default for RegexMatcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

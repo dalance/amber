@@ -30,7 +30,7 @@ macro_rules! watch_time (
 
 pub fn watch_time<F>(closure: F) -> Duration
 where
-    F: FnOnce() -> (),
+    F: FnOnce(),
 {
     let start = Instant::now();
     closure();
@@ -45,7 +45,7 @@ where
 }
 
 pub fn as_secsf64(dur: Duration) -> f64 {
-    (dur.as_secs() as f64) + (dur.subsec_nanos() as f64 / 1000_000_000.0)
+    (dur.as_secs() as f64) + (dur.subsec_nanos() as f64 / 1_000_000_000.0)
 }
 
 pub fn read_from_file(path: &str) -> Result<Vec<u8>, Error> {

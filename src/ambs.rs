@@ -7,7 +7,6 @@ use amber::pipeline_printer::PipelinePrinter;
 use amber::pipeline_sorter::PipelineSorter;
 use amber::util::{as_secsf64, decode_error, exit, read_from_file};
 use crossbeam::channel::unbounded;
-use dirs;
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::cmp;
@@ -335,7 +334,7 @@ fn main() {
     let keyword = if opt.key_from_file {
         match read_from_file(&opt.keyword) {
             Ok(x) => {
-                if x.len() != 0 {
+                if !x.is_empty() {
                     x
                 } else {
                     console.write(
@@ -520,12 +519,12 @@ fn main() {
     let sec_matcher_all = time_matcher_all.into_iter().map(as_secsf64).collect::<Vec<_>>();
 
     if opt.statistics {
-        console.write(ConsoleTextKind::Info, &format!("\nStatistics\n"));
+        console.write(ConsoleTextKind::Info, "\nStatistics\n");
         console.write(
             ConsoleTextKind::Info,
             &format!("  Max threads: {}\n\n", opt.max_threads),
         );
-        console.write(ConsoleTextKind::Info, &format!("  Consumed time ( busy / total )\n"));
+        console.write(ConsoleTextKind::Info, "  Consumed time ( busy / total )\n");
         console.write(
             ConsoleTextKind::Info,
             &format!("    Find     : {}s / {}s\n", sec_finder_bsy, sec_finder_all),

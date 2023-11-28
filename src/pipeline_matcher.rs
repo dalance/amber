@@ -48,7 +48,7 @@ impl<T: Matcher> PipelineMatcher<T> {
             errors: Vec::new(),
             time_beg: Instant::now(),
             time_bsy: Duration::new(0, 0),
-            matcher: matcher,
+            matcher,
             keyword: Vec::from(keyword),
         }
     }
@@ -83,8 +83,8 @@ impl<T: Matcher> PipelineMatcher<T> {
                 } else {
                     src.len()
                 };
-                for i in 0..check_bytes {
-                    if src[i] <= 0x08 {
+                for byte in src.iter().take(check_bytes) {
+                    if byte <= &0x08 {
                         is_binary = true;
                         break;
                     }

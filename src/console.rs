@@ -33,6 +33,12 @@ pub struct Console {
 const CR: u8 = 0x0d;
 const LF: u8 = 0x0a;
 
+impl Default for Console {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Console {
     pub fn new() -> Self {
         Console {
@@ -163,7 +169,7 @@ impl Console {
         if beg < m.beg {
             self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[beg..m.beg]));
         }
-        self.write(ConsoleTextKind::MatchText, &String::from_utf8_lossy(&rep));
+        self.write(ConsoleTextKind::MatchText, &String::from_utf8_lossy(rep));
         if m.end < end {
             self.write(ConsoleTextKind::Text, &String::from_utf8_lossy(&src[m.end..end]));
         }
@@ -171,14 +177,12 @@ impl Console {
     }
 
     fn write_stdout(&mut self, val: &str, color: Color) {
-        if self.is_color {
-            if self.color_out != color {
-                self.term_stdout.fg(color).unwrap_or_else(|_| {
-                    process::exit(1);
-                });
-                self.color_out = color;
-                self.colored_out = true;
-            }
+        if self.is_color && self.color_out != color {
+            self.term_stdout.fg(color).unwrap_or_else(|_| {
+                process::exit(1);
+            });
+            self.color_out = color;
+            self.colored_out = true;
         }
 
         write!(self.term_stdout, "{}", val).unwrap_or_else(|_| {
@@ -193,14 +197,12 @@ impl Console {
     }
 
     fn write_stderr(&mut self, val: &str, color: Color) {
-        if self.is_color {
-            if self.color_err != color {
-                self.term_stderr.fg(color).unwrap_or_else(|_| {
-                    process::exit(1);
-                });
-                self.color_err = color;
-                self.colored_err = true;
-            }
+        if self.is_color && self.color_err != color {
+            self.term_stderr.fg(color).unwrap_or_else(|_| {
+                process::exit(1);
+            });
+            self.color_err = color;
+            self.colored_err = true;
         }
 
         write!(self.term_stderr, "{}", val).unwrap_or_else(|_| {
