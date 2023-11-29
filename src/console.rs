@@ -24,10 +24,7 @@ pub struct Console {
     pub is_color: bool,
     term_stdout: Box<StdoutTerminal>,
     term_stderr: Box<StderrTerminal>,
-    color_out: Color,
-    color_err: Color,
-    colored_out: bool,
-    colored_err: bool,
+    last_color: Color,
 }
 
 const CR: u8 = 0x0d;
@@ -49,10 +46,7 @@ impl Console {
                 process::exit(1);
             }),
             is_color: true,
-            color_out: term::color::BLACK,
-            color_err: term::color::BLACK,
-            colored_out: false,
-            colored_err: false,
+            last_color: term::color::BLACK,
         }
     }
 
@@ -177,42 +171,28 @@ impl Console {
     }
 
     fn write_stdout(&mut self, val: &str, color: Color) {
-        if self.is_color && self.color_out != color {
+        if self.is_color && self.last_color != color {
             self.term_stdout.fg(color).unwrap_or_else(|_| {
                 process::exit(1);
             });
-            self.color_out = color;
-            self.colored_out = true;
+            self.last_color = color;
         }
 
         write!(self.term_stdout, "{}", val).unwrap_or_else(|_| {
             process::exit(1);
         });
-
-        //if self.is_color {
-        //    self.term_stdout.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-        //}
-
-        //let _ = io::stdout().flush();
     }
 
     fn write_stderr(&mut self, val: &str, color: Color) {
-        if self.is_color && self.color_err != color {
+        if self.is_color && self.last_color != color {
             self.term_stderr.fg(color).unwrap_or_else(|_| {
                 process::exit(1);
             });
-            self.color_err = color;
-            self.colored_err = true;
+            self.last_color = color;
         }
 
         write!(self.term_stderr, "{}", val).unwrap_or_else(|_| {
             process::exit(1);
         });
-
-        //if self.is_color {
-        //    self.term_stderr.reset().unwrap_or_else( |_| { process::exit( 1 ); } );
-        //}
-
-        //let _ = io::stderr().flush();
     }
 }

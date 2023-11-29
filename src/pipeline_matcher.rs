@@ -27,6 +27,7 @@ pub struct PathMatch {
 pub struct PipelineMatcher<T: Matcher> {
     pub skip_binary: bool,
     pub print_skipped: bool,
+    pub print_search: bool,
     pub binary_check_bytes: usize,
     pub mmap_bytes: u64,
     pub infos: Vec<String>,
@@ -42,6 +43,7 @@ impl<T: Matcher> PipelineMatcher<T> {
         PipelineMatcher {
             skip_binary: true,
             print_skipped: false,
+            print_search: false,
             binary_check_bytes: 128,
             mmap_bytes: 1024 * 1024,
             infos: Vec::new(),
@@ -91,7 +93,7 @@ impl<T: Matcher> PipelineMatcher<T> {
                 }
                 if is_binary {
                     if self.print_skipped {
-                        self.infos.push(format!("Skipped: {:?} ( binary file )\n", info.path));
+                        self.infos.push(format!("Skip (binary)    : {:?}", info.path));
                     }
                     return Ok(PathMatch {
                         path: info.path.clone(),
@@ -131,10 +133,21 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
         loop {
             match rx.recv() {
                 Ok(PipelineInfo::SeqDat(x, p)) => {
+                    let mut path = None;
+                    if self.print_search {
+                        path = Some(p.path.clone());
+                        let _ = tx.send(PipelineInfo::MsgDebug(id, format!("Search Start     : {:?}", p.path)));
+                    }
                     watch_time!(self.time_bsy, {
                         let ret = self.search_path(p);
                         let _ = tx.send(PipelineInfo::SeqDat(x, ret));
                     });
+                    if self.print_search {
+                        let _ = tx.send(PipelineInfo::MsgDebug(
+                            id,
+                            format!("Search Finish    : {:?}", path.unwrap()),
+                        ));
+                    }
                 }
 
                 Ok(PipelineInfo::SeqBeg(x)) => {
@@ -158,6 +171,9 @@ impl<T: Matcher> Pipeline<PathInfo, PathMatch> for PipelineMatcher<T> {
                     break;
                 }
 
+                Ok(PipelineInfo::MsgDebug(i, e)) => {
+                    let _ = tx.send(PipelineInfo::MsgDebug(i, e));
+                }
                 Ok(PipelineInfo::MsgInfo(i, e)) => {
                     let _ = tx.send(PipelineInfo::MsgInfo(i, e));
                 }

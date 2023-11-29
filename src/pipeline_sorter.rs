@@ -92,6 +92,9 @@ impl PipelineJoin<PathMatch, PathMatch> for PipelineSorter {
                         break;
                     }
 
+                    Ok(PipelineInfo::MsgDebug(i, e)) => {
+                        let _ = tx.send(PipelineInfo::MsgDebug(i, e));
+                    }
                     Ok(PipelineInfo::MsgInfo(i, e)) => {
                         let _ = tx.send(PipelineInfo::MsgInfo(i, e));
                     }

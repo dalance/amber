@@ -184,6 +184,9 @@ impl Pipeline<PathMatch, ()> for PipelinePrinter {
                     break;
                 }
 
+                Ok(PipelineInfo::MsgDebug(_, e)) => {
+                    self.console.write(ConsoleTextKind::Info, &format!("{}\n", e));
+                }
                 Ok(PipelineInfo::MsgInfo(i, e)) => {
                     let _ = tx.send(PipelineInfo::MsgInfo(i, e));
                 }

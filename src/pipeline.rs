@@ -6,6 +6,7 @@ pub enum PipelineInfo<T> {
     SeqDat(usize, T),
     SeqEnd(usize),
     MsgInfo(usize, String),
+    MsgDebug(usize, String),
     MsgErr(usize, String),
     MsgTime(usize, Duration, Duration),
 }

@@ -63,6 +63,10 @@ pub struct Opt {
     #[structopt(long = "mmap-bytes", default_value = "1048576", value_name = "BYTES")]
     pub mmap_bytes: u64,
 
+    /// Verbose message
+    #[structopt(long = "verbose")]
+    pub verbose: bool,
+
     /// Enable regular expression search
     #[structopt(short = "r", long = "regex", hidden = DEFAULT_FLAGS.regex)]
     pub regex: bool,
@@ -419,7 +423,7 @@ fn main() {
     finder.follow_symlink = opt.symlink;
     finder.skip_vcs = opt.skip_vcs;
     finder.skip_gitignore = opt.skip_gitignore;
-    finder.print_skipped = opt.skipped;
+    finder.print_skipped = opt.skipped | opt.verbose;
     finder.find_parent_ignore = opt.parent_ignore;
     sorter.through = !opt.fixed_order;
     replacer.is_color = opt.color;
@@ -432,7 +436,8 @@ fn main() {
     let use_regex = opt.regex;
     let use_tbm = opt.tbm;
     let skip_binary = !opt.binary;
-    let print_skipped = opt.skipped;
+    let print_skipped = opt.skipped | opt.verbose;
+    let print_search = opt.verbose;
     let binary_check_bytes = opt.bin_check_bytes;
     let mmap_bytes = opt.mmap_bytes;
     let max_threads = opt.max_threads;
@@ -451,6 +456,7 @@ fn main() {
                 let mut matcher = PipelineMatcher::new(m, &keyword);
                 matcher.skip_binary = skip_binary;
                 matcher.print_skipped = print_skipped;
+                matcher.print_search = print_search;
                 matcher.binary_check_bytes = binary_check_bytes;
                 matcher.mmap_bytes = mmap_bytes;
                 matcher.setup(id_matcher + i, rx_in, tx_out);
@@ -461,6 +467,7 @@ fn main() {
                 let mut matcher = PipelineMatcher::new(m, &keyword);
                 matcher.skip_binary = skip_binary;
                 matcher.print_skipped = print_skipped;
+                matcher.print_search = print_search;
                 matcher.binary_check_bytes = binary_check_bytes;
                 matcher.mmap_bytes = mmap_bytes;
                 matcher.setup(id_matcher + i, rx_in, tx_out);
@@ -471,6 +478,7 @@ fn main() {
                 let mut matcher = PipelineMatcher::new(m, &keyword);
                 matcher.skip_binary = skip_binary;
                 matcher.print_skipped = print_skipped;
+                matcher.print_search = print_search;
                 matcher.binary_check_bytes = binary_check_bytes;
                 matcher.mmap_bytes = mmap_bytes;
                 matcher.setup(id_matcher + i, rx_in, tx_out);

@@ -283,6 +283,9 @@ impl Pipeline<PathMatch, ()> for PipelineReplacer {
                     break;
                 }
 
+                Ok(PipelineInfo::MsgDebug(i, e)) => {
+                    let _ = tx.send(PipelineInfo::MsgDebug(i, e));
+                }
                 Ok(PipelineInfo::MsgInfo(i, e)) => {
                     let _ = tx.send(PipelineInfo::MsgInfo(i, e));
                 }

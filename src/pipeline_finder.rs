@@ -172,11 +172,11 @@ impl PipelineFinder {
         };
 
         if !ok_vcs & self.print_skipped {
-            self.infos.push(format!("Skipped: {:?} ( vcs file )\n", path));
+            self.infos.push(format!("Skip (vcs file)  : {:?}", path));
         }
 
         if !ok_git & self.print_skipped {
-            self.infos.push(format!("Skipped: {:?} ( .gitignore )\n", path));
+            self.infos.push(format!("Skip (.gitignore): {:?}", path));
         }
 
         ok_vcs && ok_git
@@ -264,6 +264,9 @@ impl PipelineFork<PathBuf, PathInfo> for PipelineFinder {
                     break;
                 }
 
+                Ok(PipelineInfo::MsgDebug(i, e)) => {
+                    let _ = tx[0].send(PipelineInfo::MsgDebug(i, e));
+                }
                 Ok(PipelineInfo::MsgInfo(i, e)) => {
                     let _ = tx[0].send(PipelineInfo::MsgInfo(i, e));
                 }
