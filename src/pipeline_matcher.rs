@@ -230,7 +230,7 @@ mod tests {
         let _ = in_tx.send(PipelineInfo::SeqDat(
             2,
             PathInfo {
-                path: PathBuf::from("./src/util.rs"),
+                path: PathBuf::from("./src/console.rs"),
             },
         ));
         let _ = in_tx.send(PipelineInfo::SeqEnd(3));
@@ -251,7 +251,7 @@ mod tests {
             if r.path == PathBuf::from("./src/ambr.rs") {
                 assert!(!r.matches.is_empty());
             }
-            if r.path == PathBuf::from("./src/util.rs") {
+            if r.path == PathBuf::from("./src/console.rs") {
                 assert!(r.matches.is_empty());
             }
         }

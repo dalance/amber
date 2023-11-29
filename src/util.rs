@@ -1,6 +1,7 @@
 use crate::console::Console;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
+use std::path::PathBuf;
 use std::process;
 use std::time::{Duration, Instant};
 
@@ -103,6 +104,21 @@ pub fn handle_escape(text: &str) -> String {
     let text = text.replace("\\t", "\t");
     let text = text.replace("\\\\", "\\");
     text
+}
+
+pub fn get_config(name: &str) -> Option<PathBuf> {
+    let dot_cfg_path = directories::BaseDirs::new()
+        .map(|base| base.home_dir().join(&format!(".{}", name)))
+        .filter(|path| path.exists());
+    let app_cfg_path = directories::ProjectDirs::from("com.github", "dalance", "amber")
+        .map(|proj| proj.preference_dir().join(name))
+        .filter(|path| path.exists());
+    let xdg_cfg_path = directories::BaseDirs::new()
+        .map(|base| base.home_dir().join(".config").join("amber").join(name))
+        .filter(|path| path.exists());
+    let etc_path = PathBuf::from(format!("/etc/amber/{}", name));
+    let etc_cfg_path = etc_path.exists().then_some(etc_path);
+    dot_cfg_path.or(app_cfg_path).or(xdg_cfg_path).or(etc_cfg_path)
 }
 
 #[cfg(not(windows))]

@@ -5,7 +5,7 @@ use amber::pipeline_finder::PipelineFinder;
 use amber::pipeline_matcher::PipelineMatcher;
 use amber::pipeline_printer::PipelinePrinter;
 use amber::pipeline_sorter::PipelineSorter;
-use amber::util::{as_secsf64, decode_error, exit, handle_escape, read_from_file};
+use amber::util::{as_secsf64, decode_error, exit, get_config, handle_escape, read_from_file};
 use crossbeam::channel::unbounded;
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -228,26 +228,20 @@ impl DefaultFlags {
     }
 
     fn load() -> DefaultFlags {
-        match dirs::home_dir() {
-            Some(mut path) => {
-                path.push(".ambs.toml");
-                if path.exists() {
-                    match fs::File::open(&path) {
-                        Ok(mut f) => {
-                            let mut s = String::new();
-                            let _ = f.read_to_string(&mut s);
-                            match toml::from_str(&s) {
-                                Ok(x) => x,
-                                Err(_) => DefaultFlags::new(),
-                            }
-                        }
+        if let Some(path) = get_config("ambs.toml") {
+            match fs::File::open(&path) {
+                Ok(mut f) => {
+                    let mut s = String::new();
+                    let _ = f.read_to_string(&mut s);
+                    match toml::from_str(&s) {
+                        Ok(x) => x,
                         Err(_) => DefaultFlags::new(),
                     }
-                } else {
-                    DefaultFlags::new()
                 }
+                Err(_) => DefaultFlags::new(),
             }
-            None => DefaultFlags::new(),
+        } else {
+            DefaultFlags::new()
         }
     }
 

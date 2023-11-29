@@ -73,7 +73,23 @@ aaa bbb aaa bbb
 
 ## Configuration
 
-Default flags can be configured by `~/.ambs.toml` and `~/.ambr.toml`.
+### Configuration path
+
+You can change configuration by writing a configuration file.
+The locations of the configuration file is OS-specific:
+
+ * Linux: `~/.config/amber/ambs.toml`, `/etc/amber/ambs.toml`
+ * macOS: `~/Library/Preferences/com.github.dalance.amber/ambs.toml`, `/etc/amber/ambs.toml`
+ * Windows: `~/AppData/Roaming/dalance/amber/config/ambs.toml`
+
+For compatibility, if `~/.ambs.toml` exists, it will be preferred to
+the OS-specific locations.
+
+The above paths are examples for the configuration of `ambs` command.
+`ambr.toml` in the same directory is used for `ambr` command.
+
+### Configurable value
+
 Available entries and default values are below:
 
 ```toml
