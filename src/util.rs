@@ -97,6 +97,14 @@ pub fn exit(code: i32, console: &mut Console) -> ! {
     process::exit(code);
 }
 
+pub fn handle_escape(text: &str) -> String {
+    let text = text.replace("\\n", "\n");
+    let text = text.replace("\\r", "\r");
+    let text = text.replace("\\t", "\t");
+    let text = text.replace("\\\\", "\\");
+    text
+}
+
 #[cfg(not(windows))]
 pub fn set_c_lflag(c_lflag: Option<termios::tcflag_t>) {
     if let Ok(mut termios) = termios::Termios::from_fd(0) {

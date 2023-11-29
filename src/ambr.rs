@@ -5,7 +5,7 @@ use amber::pipeline_finder::PipelineFinder;
 use amber::pipeline_matcher::PipelineMatcher;
 use amber::pipeline_replacer::PipelineReplacer;
 use amber::pipeline_sorter::PipelineSorter;
-use amber::util::{as_secsf64, decode_error, exit, read_from_file};
+use amber::util::{as_secsf64, decode_error, exit, handle_escape, read_from_file};
 use crossbeam::channel::unbounded;
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -379,7 +379,7 @@ fn main() {
             }
         }
     } else {
-        opt.keyword.into_bytes()
+        handle_escape(&opt.keyword).into_bytes()
     };
 
     let replacement = if opt.rep_from_file {
@@ -394,7 +394,7 @@ fn main() {
             }
         }
     } else {
-        opt.replacement.into_bytes()
+        handle_escape(&opt.replacement).into_bytes()
     };
 
     // ---------------------------------------------------------------------------------------------
