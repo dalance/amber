@@ -76,7 +76,6 @@ debug-assertions = false
 codegen-units    = 1
 
 [package.metadata.release]
-dev-version-ext            = "pre"
 pre-release-commit-message = "Prepare to v{{version}}"
 pro-release-commit-message = "Start next development iteration v{{version}}"
 tag-message                = "Bump version to {{version}}"
