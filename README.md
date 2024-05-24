@@ -29,7 +29,7 @@ You can decide to do replacing or not interactively.
 Install the `amber-search-git` package from AUR.
 
 ```
-yaourt -S amber-search-git
+yay -S amber-search-git
 ```
 
 ### Cargo
