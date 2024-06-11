@@ -47,6 +47,7 @@ term          = "0.7"
 time          = "0.3"
 toml          = "0.8"
 unicode-width = "0.1"
+ignore        = "0.4"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 termios           = "0.3"

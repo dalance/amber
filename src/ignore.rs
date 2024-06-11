@@ -4,6 +4,8 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
+use ignore::gitignore::Gitignore;
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Ignore
 // ---------------------------------------------------------------------------------------------------------------------
@@ -68,6 +70,7 @@ pub struct IgnoreGit {
     dir_name: Vec<IgnoreGitPat>,
     dir_path: Vec<IgnoreGitPat>,
     opt: MatchOptions,
+    matcher: Gitignore,
 }
 
 impl IgnoreGit {
@@ -83,6 +86,7 @@ impl IgnoreGit {
                 require_literal_separator: true,
                 require_literal_leading_dot: true,
             },
+            matcher: Gitignore::new(path).0,
         }
     }
 
