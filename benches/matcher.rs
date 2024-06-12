@@ -5,7 +5,8 @@ extern crate rand;
 extern crate test;
 
 use amber::matcher::{BruteForceMatcher, FjsMatcher, Matcher, QuickSearchMatcher, TbmMatcher};
-use rand::{Rng, SeedableRng, StdRng};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use test::Bencher;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -13,7 +14,7 @@ use test::Bencher;
 // ---------------------------------------------------------------------------------------------------------------------
 
 fn make_src() -> Box<[u8]> {
-    let seed: &[_] = &[1, 2, 3, 4];
+    let seed: [u8; 32] = [1; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
 
     const SRC_LEN: usize = 1024 * 1024 * 4;
@@ -25,7 +26,7 @@ fn make_src() -> Box<[u8]> {
 }
 
 fn make_pat(src: &[u8]) -> Box<[u8]> {
-    let seed: &[_] = &[1, 2, 3, 4];
+    let seed: [u8; 32] = [1; 32];
     let mut rng: StdRng = SeedableRng::from_seed(seed);
 
     const PAT_LEN: usize = 16;
@@ -38,7 +39,7 @@ fn make_pat(src: &[u8]) -> Box<[u8]> {
     pat
 }
 
-fn bench(b: &mut Bencher, m: &Matcher) {
+fn bench(b: &mut Bencher, m: &dyn Matcher) {
     let src = make_src();
     let pat = make_pat(&src);
 
