@@ -1,4 +1,4 @@
-use crate::ignore::{Ignore, IgnoreGit, IgnoreVcs};
+use crate::ignore::{Gitignore, Ignore, IgnoreVcs};
 use crate::pipeline::{PipelineFork, PipelineInfo};
 use crossbeam::channel::{Receiver, Sender};
 use std::fs;
@@ -34,7 +34,7 @@ pub struct PipelineFinder {
     seq_no: usize,
     current_tx: usize,
     ignore_vcs: IgnoreVcs,
-    ignore_git: Vec<IgnoreGit>,
+    ignore_git: Vec<Gitignore>,
 }
 
 impl Default for PipelineFinder {
@@ -119,7 +119,7 @@ impl PipelineFinder {
         }
     }
 
-    fn send_path(&mut self, path: PathBuf, tx: &Vec<Sender<PipelineInfo<PathInfo>>>) {
+    fn send_path(&mut self, path: PathBuf, tx: &[Sender<PipelineInfo<PathInfo>>]) {
         if self.check_path(&path, false) {
             let _ = tx[self.current_tx].send(PipelineInfo::SeqDat(self.seq_no, PathInfo { path }));
             self.seq_no += 1;
@@ -141,7 +141,7 @@ impl PipelineFinder {
                 match i {
                     Ok(entry) => {
                         if entry.path().ends_with(".gitignore") {
-                            self.ignore_git.push(IgnoreGit::new(&entry.path()));
+                            self.ignore_git.push(Gitignore::new(entry.path()).0);
                             return true;
                         }
                     }
