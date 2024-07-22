@@ -44,7 +44,7 @@ rlibc         = "1"
 serde         = {version = "1.0", features = ["derive"]}
 structopt     = "0.3"
 tempfile      = "3"
-term          = "0.7"
+term          = "1.0"
 time          = "0.3"
 toml          = "0.8"
 unicode-width = "0.1"
