@@ -2,7 +2,6 @@
 
 [![Actions Status](https://github.com/dalance/amber/workflows/Regression/badge.svg)](https://github.com/dalance/amber/actions)
 [![Crates.io](https://img.shields.io/crates/v/amber.svg)](https://crates.io/crates/amber)
-[![codecov](https://codecov.io/gh/dalance/amber/branch/master/graph/badge.svg)](https://codecov.io/gh/dalance/amber)
 
 **amber** is a code search and replace tool written by [Rust](https://www.rust-lang.org/).
 This tool is inspired by [ack](http://beyondgrep.com/),
