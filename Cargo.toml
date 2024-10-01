@@ -47,7 +47,7 @@ tempfile      = "3"
 term          = "1.0"
 time          = "0.3"
 toml          = "0.8"
-unicode-width = "0.1"
+unicode-width = "0.2"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 termios           = "0.3"
