@@ -724,9 +724,9 @@ dependencies = [
 
 [[package]]
 name = "term"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4df4175de05129f31b80458c6df371a15e7fc3fd367272e6bf938e5c351c7ea0"
+checksum = "a3bb6001afcea98122260987f8b7b5da969ecad46dbf0b5453702f776b491a41"
 dependencies = [
  "home",
  "windows-sys 0.52.0",
