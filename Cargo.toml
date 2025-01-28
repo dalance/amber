@@ -39,7 +39,7 @@ lazy_static   = "1"
 memmap        = "0.7"
 num_cpus      = "1"
 regex         = "1"
-rand          = "0.8"
+rand          = "0.9"
 rlibc         = "1"
 serde         = {version = "1.0", features = ["derive"]}
 structopt     = "0.3"
