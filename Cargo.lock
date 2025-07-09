@@ -334,15 +334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f154ce46856750ed433c8649605bf7ed2de3bc35fd9d2a9f30cddd873c80cb08"
 
 [[package]]
-name = "home"
-version = "0.5.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
-dependencies = [
- "windows-sys 0.52.0",
-]
-
-[[package]]
 name = "ignore"
 version = "0.4.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -716,11 +707,10 @@ dependencies = [
 
 [[package]]
 name = "term"
-version = "1.0.2"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a984c8d058c627faaf5e8e2ed493fa3c51771889196de1016cf9c1c6e90d750"
+checksum = "a43bddab41f8626c7bdaab872bbba75f8df5847b516d77c569c746e2ae5eb746"
 dependencies = [
- "home",
  "windows-sys 0.59.0",
 ]
 
