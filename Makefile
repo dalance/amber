@@ -30,10 +30,16 @@ release_lnx:
 	cargo build --release --target=x86_64-unknown-linux-musl
 	zip -j ${BIN_NAME}-v${VERSION}-x86_64-lnx.zip target/x86_64-unknown-linux-musl/release/amb?
 
+release_lnx_aarch64:
+	cargo build --locked --release --target=aarch64-unknown-linux-musl
+	zip -j ${BIN_NAME}-v${VERSION}-aarch64-linux.zip target/aarch64-unknown-linux-musl/release/amb?
+
 release_win:
 	cargo build --release --target=x86_64-pc-windows-msvc
 	7z a ${BIN_NAME}-v${VERSION}-x86_64-win.zip target/x86_64-pc-windows-msvc/release/amb?.exe
 
 release_mac:
 	cargo build --release --target=x86_64-apple-darwin
+	cargo build --release --target=aarch64-apple-darwin
 	zip -j ${BIN_NAME}-v${VERSION}-x86_64-mac.zip target/x86_64-apple-darwin/release/amb?
+	zip -j ${BIN_NAME}-v${VERSION}-aarch64-mac.zip target/aarch64-apple-darwin/release/amb?
