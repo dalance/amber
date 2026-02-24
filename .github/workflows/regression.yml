@@ -11,17 +11,26 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
-        rust: [stable]
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            rust: stable
+            target: aarch64-unknown-linux-gnu
+          - os: macOS-latest
+            rust: stable
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            rust: stable
+            target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.os }}
-
     steps:
-    - name: Setup Rust
-      uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: ${{ matrix.rust }}
-    - name: Checkout
-      uses: actions/checkout@v1
-    - name: Run tests
-      run: cargo test
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: ${{ matrix.target }}
+      - name: Run tests
+        run: cargo test
