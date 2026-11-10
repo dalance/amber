@@ -165,8 +165,16 @@ impl PipelineFinder {
             true
         };
 
-        let ok_git = if self.skip_gitignore && !self.ignore_git.is_empty() {
-            !self.ignore_git.last().unwrap().is_ignore(path, is_dir)
+        let ok_git = if self.skip_gitignore {
+            !self
+                .ignore_git
+                .iter()
+                .rev()
+                .find_map(|ignore| match ignore.matched(path, is_dir) {
+                    ignore::Match::None => None,
+                    matched => Some(matched.is_ignore()),
+                })
+                .unwrap_or(false)
         } else {
             true
         };
