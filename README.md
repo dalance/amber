@@ -65,7 +65,7 @@ If `--regex` option is enabled, regex captures can be used in `replacement` of `
 ```
 $ cat text.txt
 aaa bbb
-$ ambr --no-interactive --regex '(aaa) (?<pat>bbb)' '$1 $pat ${1} ${pat}' test.txt
+$ ambr --no-interactive --regex '(aaa) (?<pat>bbb)' '$1 $pat ${1} ${pat}' text.txt
 $ cat text.txt
 aaa bbb aaa bbb
 ```
